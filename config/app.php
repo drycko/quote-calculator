@@ -131,6 +131,8 @@ return [
     | used when formatting money values if no specific currency is provided. You can set this in your ".env" file.
     |
     */
-    'currency' => env('APP_CURRENCY', 'USD'),
+    'currency' => env('APP_CURRENCY', 'ZAR'),
+
+    'default_conversion_rate' => (float) env('DEFAULT_CONVERSION_RATE', 18.50),
 
 ];

@@ -56,13 +56,7 @@ class CalculatorController extends Controller
         $templates = LineItemTemplate::orderBy('category')
             ->orderBy('name')
             ->get()
-            ->groupBy('template_type');
-
-        \Log::info('Showing quote', ['quote_id' => $quote->id, 'public_token' => $token]);
-        // Log available templates for debugging
-        \Log::info('Available templates', ['templates' => $templates->pluck('name')]);
-
-        //  return view('calculator.show', compact('quote', 'templates'));
+            ->groupBy('category');
 
         return view('calculator.show', compact('quote', 'templates'));
     }
@@ -98,7 +92,7 @@ class CalculatorController extends Controller
 
     // ── Line items ───────────────────────────────────────────────
 
-    public function addItem(Request $request, string $token): RedirectResponse
+    public function addItem(Request $request, string $token, QuoteCalculator $calculator): RedirectResponse
     {
         $quote = Quote::where('public_token', $token)->firstOrFail();
 
@@ -115,7 +109,9 @@ class CalculatorController extends Controller
             'notes'            => ['nullable', 'string', 'max:1000'],
         ]);
 
-        // Ensure the phase belongs to this quote
+        $data['currency']        = $data['currency'] ?? config('app.currency', 'ZAR');
+        $data['conversion_rate'] = $data['conversion_rate'] ?? config('app.default_conversion_rate', 18.50);
+
         $phase = Phase::where('id', $data['phase_id'])
             ->where('quote_id', $quote->id)
             ->firstOrFail();
@@ -127,19 +123,50 @@ class CalculatorController extends Controller
             'total'     => 0,
         ]);
 
-        return back()->with('success', 'Item added. Click Recalculate to update totals.');
+        $calculator->calculate($quote);
+
+        return redirect(
+            route('calculator.show', $token) . '#phase-' . $phase->id
+        )->with('success', 'Item added.');
     }
 
-    public function removeItem(string $token, LineItem $lineItem): RedirectResponse
+    public function removeItem(string $token, LineItem $lineItem, QuoteCalculator $calculator): RedirectResponse
     {
         $quote = Quote::where('public_token', $token)->firstOrFail();
 
-        // Ensure the line item belongs to this quote
         abort_if($lineItem->phase->quote_id !== $quote->id, 403);
 
+        $phaseId = $lineItem->phase_id;
         $lineItem->delete();
 
-        return back()->with('success', 'Item removed.');
+        $calculator->calculate($quote);
+
+        return redirect(
+            route('calculator.show', $token) . '#phase-' . $phaseId
+        )->with('success', 'Item removed.');
+    }
+
+    public function moveItem(Request $request, string $token, LineItem $lineItem, QuoteCalculator $calculator): RedirectResponse
+    {
+        $quote = Quote::where('public_token', $token)->firstOrFail();
+
+        abort_if($lineItem->phase->quote_id !== $quote->id, 403);
+
+        $data = $request->validate([
+            'phase_id' => ['required', 'integer', 'exists:phases,id'],
+        ]);
+
+        $newPhase = Phase::where('id', $data['phase_id'])
+            ->where('quote_id', $quote->id)
+            ->firstOrFail();
+
+        $lineItem->update(['phase_id' => $newPhase->id]);
+
+        $calculator->calculate($quote);
+
+        return redirect(
+            route('calculator.show', $token) . '#phase-' . $newPhase->id
+        )->with('success', 'Item moved.');
     }
 
     // ── PDF download ─────────────────────────────────────────────

@@ -80,6 +80,30 @@
                             <input type="email" class="form-control form-control-sm" name="salesperson_email"
                                    value="{{ $quote->salesperson_email }}">
                         </div>
+                        <div class="col-12">
+                            <div class="d-flex gap-4">
+                                <div class="form-check form-switch">
+                                    <input type="hidden" name="apply_markup" value="0">
+                                    <input class="form-check-input" type="checkbox" role="switch"
+                                           name="apply_markup" value="1" id="apply_markup"
+                                           {{ $quote->apply_markup ? 'checked' : '' }}>
+                                    <label class="form-check-label small fw-semibold" for="apply_markup">
+                                        Apply markup
+                                        <span class="text-muted fw-normal">(uncheck for cost-price quotes)</span>
+                                    </label>
+                                </div>
+                                <div class="form-check form-switch">
+                                    <input type="hidden" name="apply_vat" value="0">
+                                    <input class="form-check-input" type="checkbox" role="switch"
+                                           name="apply_vat" value="1" id="apply_vat"
+                                           {{ $quote->apply_vat ? 'checked' : '' }}>
+                                    <label class="form-check-label small fw-semibold" for="apply_vat">
+                                        Apply VAT (15%)
+                                        <span class="text-muted fw-normal">(uncheck for VAT-exclusive quotes)</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
                         <div class="col-12 text-end">
                             <button type="submit" class="btn btn-outline-primary btn-sm">
                                 <i class="bi bi-save me-1"></i> Save Info
@@ -136,7 +160,7 @@
                                     <th style="width:60px;">Curr</th>
                                     <th style="width:55px;" class="text-center">Plugin</th>
                                     <th style="width:100px;" class="text-end">Total</th>
-                                    <th style="width:60px;"></th>
+                                    <th style="width:80px;"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -153,7 +177,7 @@
                                             {{ $item->calculation_type }}
                                         </span>
                                     </td>
-                                    <td class="text-muted small">{{ $item->rate ? 'R '.number_format($item->rate, 0) : ($item->currency ? $item->currency.' '.$item->rate : '—') }}</td>
+                                    <td class="text-muted small">{{ $item->rate ? format_money($item->rate, $item->currency) : '—' }}</td>
                                     <td class="text-muted small">{{ $item->calculation_type !== 'fixed' && $item->calculation_type !== 'percentage' ? $item->quantity : '—' }}</td>
                                     <td class="text-muted small">{{ $item->percentage_value ? $item->percentage_value.'%' : '—' }}</td>
                                     <td class="text-muted small">{{ $item->currency ?? 'ZAR' }}</td>
@@ -164,13 +188,47 @@
                                             <i class="bi bi-dash text-muted" style="font-size:.85rem;"></i>
                                         @endif
                                     </td>
-                                    <td class="text-end fw-semibold small">R {{ number_format($item->total, 2) }}</td>
+                                    <td class="text-end fw-semibold small">{{ format_money($item->total) }}</td>
                                     <td class="text-end">
-                                        <button type="button"
-                                                class="btn btn-xs btn-sm btn-outline-danger"
-                                                onclick="deleteItem({{ $item->id }})">
-                                            <i class="bi bi-x"></i>
-                                        </button>
+                                        <div class="btn-group" role="group">
+                                            {{-- Move to another phase --}}
+                                            <div class="dropdown">
+                                                <button type="button"
+                                                        class="btn btn-xs btn-sm btn-outline-secondary py-0 px-1 dropdown-toggle"
+                                                        data-bs-toggle="dropdown"
+                                                        title="Move to phase">
+                                                    <i class="bi bi-arrow-left-right" style="font-size:.85rem;"></i>
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end" style="min-width:140px;">
+                                                    @foreach($quote->phases as $targetPhase)
+                                                        @if($targetPhase->id !== $phase->id)
+                                                            <li>
+                                                                <form action="{{ route('line-items.move', $item->id) }}"
+                                                                      method="POST" class="d-inline">
+                                                                    @csrf @method('PATCH')
+                                                                    <input type="hidden" name="phase_id" value="{{ $targetPhase->id }}">
+                                                                    <button type="submit" class="dropdown-item" style="font-size:.8rem;">
+                                                                        @if($targetPhase->type === 'design')
+                                                                            <i class="bi bi-palette me-1"></i> Design
+                                                                        @elseif($targetPhase->type === 'development')
+                                                                            <i class="bi bi-code-slash me-1"></i> Development
+                                                                        @else
+                                                                            <i class="bi bi-plug me-1"></i> Plugins & PM
+                                                                        @endif
+                                                                    </button>
+                                                                </form>
+                                                            </li>
+                                                        @endif
+                                                    @endforeach
+                                                </ul>
+                                            </div>
+                                            {{-- Delete --}}
+                                            <button type="button"
+                                                    class="btn btn-xs btn-sm btn-outline-danger"
+                                                    onclick="deleteItem({{ $item->id }})">
+                                                <i class="bi bi-x"></i>
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                                 @endforeach
@@ -197,7 +255,7 @@
                                     <select class="form-select form-select-sm" id="template-picker-{{ $phase->id }}"
                                             onchange="fillFromTemplate(this, {{ $phase->id }})">
                                         <option value="">— pick a template —</option>
-                                        @foreach(($templates[$quote->template_type] ?? collect())->groupBy('category') as $cat => $items)
+                                        @foreach($templates as $cat => $items)
                                             <optgroup label="{{ ucfirst($cat) }}">
                                                 @foreach($items as $tpl)
                                                     <option value="{{ $tpl->id }}"
@@ -307,31 +365,31 @@
                     <tbody>
                         <tr>
                             <td class="text-muted ps-3">Subtotal</td>
-                            <td class="text-end pe-3 fw-semibold">R {{ number_format($quote->subtotal, 2) }}</td>
+                            <td class="text-end pe-3 fw-semibold">{{ format_money($quote->subtotal) }}</td>
                         </tr>
                         <tr>
                             <td class="text-muted ps-3">Main Total</td>
-                            <td class="text-end pe-3">R {{ number_format($quote->main_total, 2) }}</td>
+                            <td class="text-end pe-3">{{ format_money($quote->main_total) }}</td>
                         </tr>
                         <tr>
                             <td class="text-muted ps-3">Plugin Total</td>
-                            <td class="text-end pe-3">R {{ number_format($quote->plugin_total, 2) }}</td>
+                            <td class="text-end pe-3">{{ format_money($quote->plugin_total) }}</td>
                         </tr>
                         <tr class="table-light">
                             <td class="ps-3 text-muted">Markup ({{ $quote->markup_rate }}%)</td>
-                            <td class="text-end pe-3">R {{ number_format($quote->markup_amount, 2) }}</td>
+                            <td class="text-end pe-3">{{ format_money($quote->markup_amount) }}</td>
                         </tr>
                         <tr>
                             <td class="ps-3 text-muted">Total ex VAT</td>
-                            <td class="text-end pe-3">R {{ number_format($quote->total_ex_vat, 2) }}</td>
+                            <td class="text-end pe-3">{{ format_money($quote->total_ex_vat) }}</td>
                         </tr>
                         <tr>
                             <td class="ps-3 text-muted">VAT (15%)</td>
-                            <td class="text-end pe-3">R {{ number_format($quote->vat, 2) }}</td>
+                            <td class="text-end pe-3">{!! $quote->apply_vat ? format_money($quote->vat) : '<span class="text-muted small">excl.</span>' !!}</td>
                         </tr>
                         <tr class="table-success">
-                            <td class="ps-3 fw-bold">Total inc VAT</td>
-                            <td class="text-end pe-3 fw-bold fs-5">R {{ number_format($quote->total_inc_vat, 2) }}</td>
+                            <td class="ps-3 fw-bold">Total {{ $quote->apply_vat ? 'inc VAT' : 'ex VAT' }}</td>
+                            <td class="text-end pe-3 fw-bold fs-5">{{ format_money($quote->total_inc_vat) }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -374,6 +432,17 @@
 
 @push('scripts')
 <script>
+// Restore active tab from URL hash on page load
+document.addEventListener('DOMContentLoaded', function () {
+    const hash = window.location.hash;
+    if (hash) {
+        const target = document.querySelector('[data-bs-target="' + hash + '"]');
+        if (target) {
+            bootstrap.Tab.getOrCreateInstance(target).show();
+        }
+    }
+});
+
 function fillFromTemplate(select, phaseId) {
     const opt = select.options[select.selectedIndex];
     if (!opt.value) return;

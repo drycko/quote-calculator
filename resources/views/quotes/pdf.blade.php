@@ -227,7 +227,7 @@
                         <td><span class="type-badge">{{ $item->calculation_type }}</span></td>
                         <td class="num">
                             @if($item->rate)
-                                {{ $item->currency !== 'ZAR' ? $item->currency : 'R' }} {{ number_format($item->rate, 0) }}
+                                {{ format_money($item->rate, $item->currency) }}
                             @else
                                 —
                             @endif
@@ -236,12 +236,12 @@
                         <td class="num">{{ $item->percentage_value ? $item->percentage_value . '%' : '—' }}</td>
                         <td>{{ $item->currency ?? 'ZAR' }}</td>
                         <td>{{ $item->is_plugin ? '<span class="plugin-badge">Yes</span>' : '' }}</td>
-                        <td class="num"><strong>R {{ number_format($item->total, 2) }}</strong></td>
+                        <td class="num"><strong>{{ format_money($item->total) }}</strong></td>
                     </tr>
                     @endforeach
                     <tr class="phase-subtotal">
                         <td colspan="7">Phase Subtotal</td>
-                        <td class="num">R {{ number_format($phase->lineItems->sum('total'), 2) }}</td>
+                        <td class="num">{{ format_money($phase->lineItems->sum('total')) }}</td>
                     </tr>
                 </tbody>
             </table>
@@ -253,33 +253,33 @@
         <table class="totals-table">
             <tr>
                 <td class="label-col">Subtotal</td>
-                <td class="value-col">R {{ number_format($quote->subtotal, 2) }}</td>
+                <td class="value-col">{{ format_money($quote->subtotal) }}</td>
             </tr>
             <tr>
                 <td class="label-col">Main Items Total</td>
-                <td class="value-col">R {{ number_format($quote->main_total, 2) }}</td>
+                <td class="value-col">{{ format_money($quote->main_total) }}</td>
             </tr>
             <tr>
                 <td class="label-col">Plugin Total</td>
-                <td class="value-col">R {{ number_format($quote->plugin_total, 2) }}</td>
+                <td class="value-col">{{ format_money($quote->plugin_total) }}</td>
             </tr>
             @if($quote->markup_amount > 0)
             <tr>
                 <td class="label-col">Markup ({{ $quote->markup_rate }}%)</td>
-                <td class="value-col">R {{ number_format($quote->markup_amount, 2) }}</td>
+                <td class="value-col">{{ format_money($quote->markup_amount) }}</td>
             </tr>
             @endif
             <tr class="divider">
                 <td class="label-col">Total ex VAT</td>
-                <td class="value-col">R {{ number_format($quote->total_ex_vat, 2) }}</td>
+                <td class="value-col">{{ format_money($quote->total_ex_vat) }}</td>
             </tr>
             <tr>
                 <td class="label-col">VAT (15%)</td>
-                <td class="value-col">R {{ number_format($quote->vat, 2) }}</td>
+                <td class="value-col">{{ $quote->apply_vat ? format_money($quote->vat) : 'Excl.' }}</td>
             </tr>
             <tr class="grand-total">
-                <td class="label-col">TOTAL INC VAT</td>
-                <td class="value-col">R {{ number_format($quote->total_inc_vat, 2) }}</td>
+                <td class="label-col">TOTAL {{ $quote->apply_vat ? 'INC VAT' : 'EX VAT' }}</td>
+                <td class="value-col">{{ format_money($quote->total_inc_vat) }}</td>
             </tr>
         </table>
     </div>

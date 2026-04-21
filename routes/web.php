@@ -20,6 +20,7 @@ Route::post('/calculator/{token}/recalculate',              [CalculatorControlle
 Route::get('/calculator/{token}/pdf',                       [CalculatorController::class, 'downloadPdf'])->name('calculator.pdf');
 Route::post('/calculator/{token}/items',                    [CalculatorController::class, 'addItem'])->name('calculator.items.store');
 Route::delete('/calculator/{token}/items/{lineItem}',       [CalculatorController::class, 'removeItem'])->name('calculator.items.destroy');
+Route::patch('/calculator/{token}/items/{lineItem}/move',   [CalculatorController::class, 'moveItem'])->name('calculator.items.move');
 
 Auth::routes();
 
@@ -41,6 +42,7 @@ Route::middleware(['auth'])->group(function () {
     // Admin line item management (for admin edit view)
     Route::post('/line-items', [LineItemController::class, 'store'])->name('line-items.store');
     Route::delete('/line-items/{lineItem}', [LineItemController::class, 'destroy'])->name('line-items.destroy');
+    Route::patch('/line-items/{lineItem}/move', [LineItemController::class, 'move'])->name('line-items.move');
 
     // Line item templates
     Route::resource('templates', LineItemTemplateController::class)->except(['show']);

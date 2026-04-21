@@ -105,7 +105,7 @@
                                     <th style="width:60px;">Curr</th>
                                     <th style="width:55px;" class="text-center">Plugin</th>
                                     <th style="width:95px;" class="text-end">Total</th>
-                                    <th style="width:50px;"></th>
+                                    <th style="width:80px;"></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -141,10 +141,45 @@
                                     </td>
                                     <td class="text-end fw-semibold small">{{ format_money($item->total) }}</td>
                                     <td class="text-end">
-                                        <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1"
-                                                onclick="deleteItem('{{ $quote->public_token }}', {{ $item->id }})">
-                                            <i class="bi bi-x" style="font-size:.85rem;"></i>
-                                        </button>
+                                        <div class="btn-group" role="group">
+                                            {{-- Move to another phase --}}
+                                            <div class="dropdown">
+                                                <button type="button"
+                                                        class="btn btn-sm btn-outline-secondary py-0 px-1 dropdown-toggle"
+                                                        data-bs-toggle="dropdown"
+                                                        title="Move to phase">
+                                                    <i class="bi bi-arrow-left-right" style="font-size:.85rem;"></i>
+                                                </button>
+                                                <ul class="dropdown-menu dropdown-menu-end" style="min-width:140px;">
+                                                    @foreach($quote->phases as $targetPhase)
+                                                        @if($targetPhase->id !== $phase->id)
+                                                            <li>
+                                                                <form action="{{ route('calculator.items.move', [$quote->public_token, $item->id]) }}"
+                                                                      method="POST" class="d-inline">
+                                                                    @csrf @method('PATCH')
+                                                                    <input type="hidden" name="phase_id" value="{{ $targetPhase->id }}">
+                                                                    <button type="submit" class="dropdown-item" style="font-size:.8rem;">
+                                                                        @if($targetPhase->type === 'design')
+                                                                            <i class="bi bi-palette me-1"></i> Design
+                                                                        @elseif($targetPhase->type === 'development')
+                                                                            <i class="bi bi-code-slash me-1"></i> Development
+                                                                        @else
+                                                                            <i class="bi bi-plug me-1"></i> Plugins & PM
+                                                                        @endif
+                                                                    </button>
+                                                                </form>
+                                                            </li>
+                                                        @endif
+                                                    @endforeach
+                                                </ul>
+                                            </div>
+                                            {{-- Delete --}}
+                                            <button type="button" class="btn btn-sm btn-outline-danger py-0 px-1"
+                                                    onclick="deleteItem('{{ $quote->public_token }}', {{ $item->id }})">
+                                                <i class="bi bi-x" style="font-size:.85rem;"></i>
+
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                                 @endforeach
@@ -154,6 +189,51 @@
                     @else
                         <p class="text-muted small my-2">No items in this phase.</p>
                     @endif
+
+                    {{-- Add from template --}}
+                    <div class="mt-3">
+                        <form action="{{ route('calculator.items.store', $quote->public_token) }}"
+                              method="POST" id="add-form-{{ $phase->id }}">
+                            @csrf
+                            <input type="hidden" name="phase_id"         value="{{ $phase->id }}">
+                            <input type="hidden" name="name"             id="h-name-{{ $phase->id }}">
+                            <input type="hidden" name="calculation_type" id="h-type-{{ $phase->id }}">
+                            <input type="hidden" name="rate"             id="h-rate-{{ $phase->id }}">
+                            <input type="hidden" name="quantity"         value="1">
+                            <input type="hidden" name="percentage_value" id="h-pct-{{ $phase->id }}">
+                            <input type="hidden" name="currency"         id="h-curr-{{ $phase->id }}">
+                            <input type="hidden" name="conversion_rate"  id="h-conv-{{ $phase->id }}">
+                            <input type="hidden" name="is_plugin"        id="h-plugin-{{ $phase->id }}" value="0">
+                            <input type="hidden" name="notes"            id="h-notes-{{ $phase->id }}">
+
+                            <div class="input-group">
+                                <select class="form-select form-select-sm"
+                                        onchange="pickTemplate(this, {{ $phase->id }})">
+                                    <option value="">— add item from template —</option>
+                                    @foreach($templates as $cat => $items)
+                                        <optgroup label="{{ ucfirst($cat) }}">
+                                            @foreach($items as $tpl)
+                                                <option value="{{ $tpl->id }}"
+                                                        data-name="{{ $tpl->name }}"
+                                                        data-type="{{ $tpl->calculation_type }}"
+                                                        data-rate="{{ $tpl->default_rate }}"
+                                                        data-pct="{{ $tpl->default_percentage }}"
+                                                        data-currency="{{ $tpl->currency }}"
+                                                        data-conversion="{{ $tpl->conversion_rate }}"
+                                                        data-plugin="{{ $tpl->is_plugin ? '1' : '0' }}"
+                                                        data-notes="{{ $tpl->default_notes }}">
+                                                    {{ $tpl->name }}
+                                                </option>
+                                            @endforeach
+                                        </optgroup>
+                                    @endforeach
+                                </select>
+                                <button type="submit" class="btn btn-primary btn-sm" id="add-btn-{{ $phase->id }}" disabled>
+                                    <i class="bi bi-plus me-1"></i> Add
+                                </button>
+                            </div>
+                        </form>
+                    </div>
 
                 </div>
                 @endforeach
@@ -181,11 +261,11 @@
                             <td class="text-end pe-3">{{ format_money($quote->total_ex_vat) }}</td>
                         </tr>
                         <tr>
-                            <td class="ps-3 text-muted">VAT (15%)</td>
-                            <td class="text-end pe-3">{{ format_money($quote->vat) }}</td>
+                            <td class="ps-3 text-muted">VAT ({{ config('quote.vat_rate') * 100 }}%)</td>
+                            <td class="text-end pe-3">{!! $quote->apply_vat ? format_money($quote->vat) : '<span class="text-muted small">excl.</span>' !!}</td>
                         </tr>
                         <tr class="table-success">
-                            <td class="ps-3 fw-bold">Total inc VAT</td>
+                            <td class="ps-3 fw-bold">Total {{ $quote->apply_vat ? 'inc VAT' : 'ex VAT' }}</td>
                             <td class="text-end pe-3 fw-bold fs-5">{{ format_money($quote->total_inc_vat) }}</td>
                         </tr>
                     </tbody>
@@ -224,36 +304,47 @@
 
 @push('scripts')
 <script>
-function fillFromTemplate(select, phaseId) {
-    const opt = select.options[select.selectedIndex];
-    if (!opt.value) return;
-
-    document.getElementById('name-'   + phaseId).value = opt.dataset.name       ?? '';
-    document.getElementById('rate-'   + phaseId).value = opt.dataset.rate       ?? '';
-    document.getElementById('pct-'    + phaseId).value = opt.dataset.pct        ?? '';
-    document.getElementById('conv-'   + phaseId).value = opt.dataset.conversion ?? '';
-    document.getElementById('notes-'  + phaseId).value = opt.dataset.notes      ?? '';
-
-    ['calc-' + phaseId, 'curr-' + phaseId].forEach((id, i) => {
-        const val = i === 0 ? opt.dataset.type : opt.dataset.currency;
-        if (val) {
-            const sel = document.getElementById(id);
-            for (let o of sel.options) o.selected = (o.value === val);
+// Restore active tab from URL hash on page load
+document.addEventListener('DOMContentLoaded', function () {
+    const hash = window.location.hash;
+    if (hash) {
+        const target = document.querySelector('[data-bs-target="' + hash + '"]');
+        if (target) {
+            bootstrap.Tab.getOrCreateInstance(target).show();
         }
-    });
+    }
+});
 
-    document.getElementById('plugin-' + phaseId).checked = (opt.dataset.plugin === '1');
+function pickTemplate(select, phaseId) {
+    const opt = select.options[select.selectedIndex];
+    const btn = document.getElementById('add-btn-' + phaseId);
+
+    if (!opt.value) {
+        btn.disabled = true;
+        return;
+    }
+
+    document.getElementById('h-name-'   + phaseId).value = opt.dataset.name       ?? '';
+    document.getElementById('h-type-'   + phaseId).value = opt.dataset.type       ?? 'fixed';
+    document.getElementById('h-rate-'   + phaseId).value = opt.dataset.rate       ?? '';
+    document.getElementById('h-pct-'    + phaseId).value = opt.dataset.pct        ?? '';
+    document.getElementById('h-curr-'   + phaseId).value = opt.dataset.currency   ?? 'ZAR';
+    document.getElementById('h-conv-'   + phaseId).value = opt.dataset.conversion ?? '';
+    document.getElementById('h-plugin-' + phaseId).value = opt.dataset.plugin     ?? '0';
+    document.getElementById('h-notes-'  + phaseId).value = opt.dataset.notes      ?? '';
+
+    btn.disabled = false;
 }
 
 function deleteItem(token, itemId) {
     if (!confirm('Remove this line item?')) return;
-    const form    = document.createElement('form');
-    form.method   = 'POST';
-    form.action   = '/calculator/' + token + '/items/' + itemId;
-    const csrf    = document.createElement('input');
-    csrf.type     = 'hidden'; csrf.name = '_token'; csrf.value = '{{ csrf_token() }}';
-    const method  = document.createElement('input');
-    method.type   = 'hidden'; method.name = '_method'; method.value = 'DELETE';
+    const form   = document.createElement('form');
+    form.method  = 'POST';
+    form.action  = '/calculator/' + token + '/items/' + itemId;
+    const csrf   = document.createElement('input');
+    csrf.type    = 'hidden'; csrf.name = '_token'; csrf.value = '{{ csrf_token() }}';
+    const method = document.createElement('input');
+    method.type  = 'hidden'; method.name = '_method'; method.value = 'DELETE';
     form.appendChild(csrf);
     form.appendChild(method);
     document.body.appendChild(form);

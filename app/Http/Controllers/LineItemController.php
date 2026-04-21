@@ -4,11 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\LineItem;
 use App\Models\Phase;
+use App\Services\QuoteCalculator;
 use Illuminate\Http\Request;
 
 class LineItemController extends Controller
 {
-    public function store(Request $request)
+    public function store(Request $request, QuoteCalculator $calculator)
     {
         $data = $request->validate([
             'phase_id'         => ['required', 'integer', 'exists:phases,id'],
@@ -23,28 +24,58 @@ class LineItemController extends Controller
             'notes'            => ['nullable', 'string', 'max:1000'],
         ]);
 
-        // Authorise: the phase must belong to a quote owned by the user
         $phase = Phase::with('quote')->findOrFail($data['phase_id']);
         abort_if($phase->quote->user_id !== auth()->id(), 403);
 
         $data['is_plugin'] = (bool) ($data['is_plugin'] ?? false);
         $data['quantity']  = $data['quantity'] ?? 1;
-        $data['total']     = 0; // will be set on next recalculate
+        $data['total']     = 0;
 
         LineItem::create($data);
 
-        return redirect()->route('quotes.edit', $phase->quote_id)
-                         ->with('success', 'Line item added. Click Recalculate to update totals.');
+        $calculator->calculate($phase->quote);
+
+        return redirect(
+            route('quotes.edit', $phase->quote_id) . '#phase-' . $phase->id
+        )->with('success', 'Line item added.');
     }
 
-    public function destroy(LineItem $lineItem)
+    public function destroy(LineItem $lineItem, QuoteCalculator $calculator)
     {
-        $quoteId = $lineItem->phase->quote_id;
-        abort_if($lineItem->phase->quote->user_id !== auth()->id(), 403);
+        $phase   = $lineItem->phase;
+        $quote   = $phase->quote;
+        abort_if($quote->user_id !== auth()->id(), 403);
 
+        $phaseId = $phase->id;
         $lineItem->delete();
 
-        return redirect()->route('quotes.edit', $quoteId)
-                         ->with('success', 'Line item removed.');
+        $calculator->calculate($quote);
+
+        return redirect(
+            route('quotes.edit', $quote->id) . '#phase-' . $phaseId
+        )->with('success', 'Line item removed.');
+    }
+
+    public function move(Request $request, LineItem $lineItem, QuoteCalculator $calculator)
+    {
+        $phase = $lineItem->phase;
+        $quote = $phase->quote;
+        abort_if($quote->user_id !== auth()->id(), 403);
+
+        $data = $request->validate([
+            'phase_id' => ['required', 'integer', 'exists:phases,id'],
+        ]);
+
+        $newPhase = Phase::where('id', $data['phase_id'])
+            ->where('quote_id', $quote->id)
+            ->firstOrFail();
+
+        $lineItem->update(['phase_id' => $newPhase->id]);
+
+        $calculator->calculate($quote);
+
+        return redirect(
+            route('quotes.edit', $quote->id) . '#phase-' . $newPhase->id
+        )->with('success', 'Item moved.');
     }
 }

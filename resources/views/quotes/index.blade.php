@@ -48,9 +48,9 @@
                             </span>
                         </td>
                         <td class="text-muted small">{{ $quote->salesperson_name ?? '—' }}</td>
-                        <td class="text-end">R {{ number_format($quote->subtotal, 2) }}</td>
-                        <td class="text-end">R {{ number_format($quote->total_ex_vat, 2) }}</td>
-                        <td class="text-end fw-semibold">R {{ number_format($quote->total_inc_vat, 2) }}</td>
+                        <td class="text-end">{{ format_money($quote->subtotal) }}</td>
+                        <td class="text-end">{{ format_money($quote->total_ex_vat) }}</td>
+                        <td class="text-end fw-semibold">{{ format_money($quote->total_inc_vat) }}</td>
                         <td class="text-muted small">{{ $quote->created_at->format('d M Y') }}</td>
                         <td class="text-end">
                             <a href="{{ route('quotes.edit', $quote) }}" class="btn btn-xs btn-sm btn-outline-primary me-1">

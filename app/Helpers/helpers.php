@@ -185,7 +185,7 @@ if (!function_exists('get_conversion_rate')) {
                 // fall through to default
             }
 
-            return (float) env('DEFAULT_CONVERSION_RATE', 18.50);
+            return (float) config('app.default_conversion_rate', 18.50);
         });
     }
 }

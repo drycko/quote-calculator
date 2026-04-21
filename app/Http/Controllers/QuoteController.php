@@ -35,11 +35,15 @@ class QuoteController extends Controller
             'salesperson_name'  => ['nullable', 'string', 'max:255'],
             'salesperson_email' => ['nullable', 'email', 'max:255'],
             'template_type'     => ['required', 'in:web,manual,ilead'],
+            'apply_markup'      => ['nullable', 'boolean'],
+            'apply_vat'         => ['nullable', 'boolean'],
         ]);
 
         $quote = Quote::create([
             'user_id'      => auth()->id(),
             'public_token' => Str::uuid()->toString(),
+            'apply_markup' => $validated['apply_markup'] ?? true,
+            'apply_vat'    => $validated['apply_vat'] ?? true,
             ...$validated,
         ]);
 
@@ -63,7 +67,7 @@ class QuoteController extends Controller
         $templates = LineItemTemplate::orderBy('category')
             ->orderBy('name')
             ->get()
-            ->groupBy('template_type');
+            ->groupBy('category');
 
         return view('quotes.edit', compact('quote', 'templates'));
     }
@@ -75,9 +79,15 @@ class QuoteController extends Controller
             'salesperson_name'  => ['nullable', 'string', 'max:255'],
             'salesperson_email' => ['nullable', 'email', 'max:255'],
             'template_type'     => ['required', 'in:web,manual,ilead'],
+            'apply_markup'      => ['nullable', 'boolean'],
+            'apply_vat'         => ['nullable', 'boolean'],
         ]);
 
-        $quote->update($validated);
+        $quote->update([
+            ...$validated,
+            'apply_markup' => $request->boolean('apply_markup'),
+            'apply_vat'    => $request->boolean('apply_vat'),
+        ]);
 
         return back()->with('success', 'Quote updated.');
     }

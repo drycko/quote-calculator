@@ -15,6 +15,8 @@ class Quote extends Model
         'salesperson_name',
         'salesperson_email',
         'template_type',
+        'apply_markup',
+        'apply_vat',
         'subtotal',
         'main_total',
         'plugin_total',
@@ -38,6 +40,8 @@ class Quote extends Model
             'vat'            => 'decimal:2',
             'total_inc_vat'  => 'decimal:2',
             'snapshot'       => 'array',
+            'apply_markup'   => 'boolean',
+            'apply_vat'      => 'boolean',
         ];
     }
 
