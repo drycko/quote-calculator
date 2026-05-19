@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
-# server-deploy.sh — Swift Steel production deployment
+# server-deploy.sh — Laravel cPanel production deployment
 #
 # Upload this script to the server ONCE, then run it for every new deployment:
-#   scp server-deploy.sh swiftsteel:~/
-#   ssh swiftsteel 'bash ~/server-deploy.sh ~/deploy_20260419_202947.zip'
+#   scp server-deploy.sh myapp:~/
+#   ssh myapp 'bash ~/server-deploy.sh ~/deploy_20260518_180835.zip'
 #
 # Prerequisites (one-time):
-#   1. Create ~/.env.production with your production environment variables.
+#   1. Place a .env.production file inside the zip (alongside artisan) with your production environment variables.
 #   2. Upload this script to ~/server-deploy.sh on the server.
 #
 # Persistent storage (uploaded files) lives in ~/persistent_storage/app/public/
@@ -21,12 +21,11 @@ PHP="${PHP_BIN:-php}"
 HOME_DIR="$HOME"
 PUBLIC_HTML="$HOME_DIR/public_html"
 PERSISTENT="$HOME_DIR/persistent_storage"
-ENV_FILE="$HOME_DIR/.env.production"
-DEPLOY_FOLDER_PLACEHOLDER="swiftshop_deploy"   # must match index.production.php
+DEPLOY_FOLDER_PLACEHOLDER="laravel_deploy"   # must match index.production.php
 LOCK_FILE="$PERSISTENT/installed"              # written by install.php after first setup
 # ─────────────────────────────────────────────────────────────────────────────
 
-ZIP_PATH="${1:?Usage: bash server-deploy.sh <path-to-zip>}"
+ZIP_PATH="${1:?Usage: bash server-deploy.sh <path-to-zip>}" #
 ZIP_PATH="$(realpath "$ZIP_PATH")"
 
 if [[ ! -f "$ZIP_PATH" ]]; then
@@ -36,10 +35,11 @@ fi
 
 ZIP_BASENAME="$(basename "$ZIP_PATH" .zip)"
 DEPLOY_DIR="$HOME_DIR/$ZIP_BASENAME"
+ENV_FILE="$DEPLOY_DIR/.env.production"
 
 echo ""
 echo "════════════════════════════════════════════════"
-echo "  Swift Steel — Production Deployment"
+echo "  Laravel — Production Deployment"
 echo "  Package : $ZIP_BASENAME"
 echo "  Target  : $DEPLOY_DIR"
 echo "════════════════════════════════════════════════"
@@ -57,8 +57,9 @@ if [[ -f "$ENV_FILE" ]]; then
     echo "✅  .env copied from $ENV_FILE"
 else
     echo ""
-    echo "⚠️   ~/.env.production not found."
-    echo "    Create it, copy your .env to $DEPLOY_DIR/.env manually,"
+    echo "⚠️   .env.production not found in deploy package."
+    echo "    Add a .env.production file to the root of your zip,"
+    echo "    or copy your .env to $DEPLOY_DIR/.env manually,"
     echo "    then run artisan commands (step 5) yourself."
     echo ""
 fi
@@ -160,7 +161,8 @@ echo "    Backup    : $BACKUP_DIR"
 if [[ ! -f "$LOCK_FILE" ]]; then
     echo ""
     echo "  ➡  NEXT STEP: Open the installer in your browser:"
-    echo "     https://yourdomain.com/install.php"
+    echo "     https://public_html/install.php"
 fi
 echo "════════════════════════════════════════════════"
 echo ""
+

@@ -4,11 +4,11 @@ Below is your **clean, updated Specdoc v2**, aligned with the real workbook logi
 
 ---
 
-# 🚀 Specdoc v2 — Quote Calculator (Laravel 12 + UI Auth)
+# Specdoc v2 — Quote Calculator (Laravel 12 + UI Auth)
 
 ---
 
-## 🧠 Core Philosophy
+## Core Philosophy
 
 This is:
 
@@ -22,7 +22,7 @@ NOT:
 
 ---
 
-## 🔥 Key System Capabilities
+## Key System Capabilities
 
 * Modular line item system
 * Multi-type calculation engine
@@ -40,7 +40,7 @@ NOT:
 
 ---
 
-# 🔐 STEP 2 — Auth System
+# STEP 2 — Auth System
 
 Using Laravel UI + Bootstrap Auth:
 
@@ -54,7 +54,7 @@ artisan migrate
 
 ---
 
-# 🧠 STEP 3 — Core Models
+# STEP 3 — Core Models
 
 ```bash
 artisan make:model Quote -mcr
@@ -165,9 +165,9 @@ $table->timestamps();
 
 ---
 
-# 🧠 STEP 5 — Calculation Engine (UPDATED CONCEPT)
+# STEP 5 — Calculation Engine (UPDATED CONCEPT)
 
-## 🔁 Two-Pass Calculation
+## Two-Pass Calculation
 
 ### Pass 1:
 
@@ -192,7 +192,7 @@ $table->timestamps();
 
 ---
 
-## 💱 Currency Conversion
+## Currency Conversion
 
 Config-based:
 
@@ -210,7 +210,7 @@ return [
 
 ---
 
-# 📊 STEP 6 — Markup Engine (REPLACES COMMISSION)
+# STEP 6 — Markup Engine (REPLACES COMMISSION)
 
 ## Dynamic Markup Tiers (Ex VAT)
 
@@ -231,7 +231,7 @@ return [
 
 ---
 
-# ⚠️ STEP 7 — Plugin Separation (CRITICAL)
+# STEP 7 — Plugin Separation (CRITICAL)
 
 System MUST:
 
@@ -250,7 +250,7 @@ plugin_total
 
 ---
 
-# 🧠 STEP 8 — Snapshot System
+# STEP 8 — Snapshot System
 
 Each calculation stores:
 
@@ -271,7 +271,7 @@ Each calculation stores:
 
 ---
 
-# 🎯 STEP 9 — Controller Responsibilities
+# STEP 9 — Controller Responsibilities
 
 * Create quote (attach user)
 * Load templates
@@ -280,7 +280,7 @@ Each calculation stores:
 
 ---
 
-# 🔐 STEP 10 — Routes
+# STEP 10 — Routes
 
 ```php
 Route::middleware(['auth'])->group(function () {
@@ -291,7 +291,7 @@ Route::middleware(['auth'])->group(function () {
 
 ---
 
-# 🧩 STEP 11 — UI Structure (UPDATED)
+# STEP 11 — UI Structure (UPDATED)
 
 ---
 
@@ -340,7 +340,7 @@ User must choose:
 
 ---
 
-# ⚙️ STEP 12 — Template System (IMPORTANT)
+# STEP 12 — Template System (IMPORTANT)
 
 Templates act as:
 
@@ -354,7 +354,7 @@ System must:
 
 ---
 
-# 🧠 STEP 13 — Manual Adjust Mode
+# STEP 13 — Manual Adjust Mode
 
 Allows:
 
@@ -364,7 +364,7 @@ Allows:
 
 ---
 
-# 📄 STEP 14 — Output
+# STEP 14 — Output
 
 * Internal calculation view
 * Client-facing PDF (later)
@@ -372,7 +372,7 @@ Allows:
 
 ---
 
-# 🚀 FINAL SYSTEM SUMMARY
+# FINAL SYSTEM SUMMARY
 
 You are building:
 
@@ -380,7 +380,7 @@ You are building:
 
 ---
 
-# 🔥 What Changed From v1
+# What Changed From v1
 
 | v1               | v2                |
 | ---------------- | ----------------- |
@@ -393,10 +393,10 @@ You are building:
 
 ---
 
-# ⚡ Final Note
+# Final Note
 
 This spec now:
 
-* Matches your workbook ✅
-* Prevents future rewrites ✅
-* Scales into SaaS ✅
+* Matches your workbook
+* Prevents future rewrites
+* Scales into SaaS

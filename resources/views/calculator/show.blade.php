@@ -3,65 +3,123 @@
 @section('title', $quote->client_name ? 'Quote — ' . $quote->client_name : 'Quote Builder')
 
 @section('nav-actions')
-    <a href="{{ route('calculator.pdf', $quote->public_token) }}"
+    {{-- <a href="{{ route('calculator.pdf', $quote->public_token) }}"
        class="btn btn-success btn-sm">
         <i class="bi bi-file-earmark-pdf me-1"></i> Download PDF
-    </a>
-    <form action="{{ route('calculator.recalculate', $quote->public_token) }}" method="POST" class="d-inline">
-        @csrf
-        <button type="submit" class="btn btn-outline-primary btn-sm">
-            <i class="bi bi-arrow-repeat me-1"></i> Recalculate
-        </button>
-    </form>
+    </a> --}}
+    @if($quote->isPublicEditable())
+        <form action="{{ route('calculator.recalculate', $quote->public_token) }}" method="POST" class="d-inline">
+            @csrf
+            <button type="submit" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-arrow-repeat me-1"></i> Recalculate
+            </button>
+        </form>
+    @endif
 @endsection
 
 @section('content')
+
+@include('partials.choices-cdn')
+@php
+    $isEditable = $quote->isPublicEditable();
+@endphp
+<style>
+    .phase-builder-card,
+    .phase-builder-card .card-body,
+    .phase-builder-card .tab-content,
+    .phase-builder-card .tab-pane,
+    .template-picker-group {
+        overflow: visible;
+    }
+
+    .template-picker-group .choices {
+        flex: 1 1 auto;
+        width: 1%;
+        min-width: 0;
+        margin-bottom: 0;
+    }
+
+    .template-picker-group .choices__inner {
+        min-height: calc(1.5em + .5rem + 2px);
+        padding: .25rem 2rem .25rem .5rem;
+        font-size: .875rem;
+        border-top-right-radius: 0;
+        border-bottom-right-radius: 0;
+    }
+
+    .template-picker-group .choices[data-type*=select-one]::after {
+        right: .75rem;
+        margin-top: -3px;
+    }
+
+    .template-picker-group .choices__list--single {
+        padding: 0;
+    }
+
+    .template-picker-group .choices__list--dropdown,
+    .template-picker-group .choices__list[aria-expanded] {
+        z-index: 2000;
+    }
+</style>
 <div class="row g-4">
 
     {{-- ── LEFT: Builder ──────────────────────────────────────── --}}
     <div class="col-xl-8">
+        @if(!$isEditable)
+            <div class="alert alert-info border-0 shadow-sm">
+                <div class="fw-semibold">Quote submitted for review</div>
+                <div class="small mb-0">Your quote is locked while our sales team reviews it.</div>
+            </div>
+        @endif
 
         {{-- Quote info --}}
         <div class="card border-0 shadow-sm mb-4">
             <div class="card-header bg-transparent fw-semibold border-bottom d-flex justify-content-between align-items-center">
                 <span><i class="bi bi-person me-2"></i>Quote Details</span>
-                <span class="badge bg-secondary bg-opacity-10 text-secondary text-uppercase" style="font-size:.65rem;">
-                    {{ $quote->template_type }}
-                </span>
+                <div class="d-flex gap-2">
+                    <span class="badge bg-primary bg-opacity-10 text-primary" style="font-size:.65rem;">
+                        {{ $quote->quote_number }}
+                    </span>
+                    <span class="badge bg-secondary bg-opacity-10 text-secondary" style="font-size:.65rem;">
+                        {{ \App\Models\Quote::statuses()[$quote->status] ?? $quote->status }}
+                    </span>
+                </div>
             </div>
             <div class="card-body">
                 <form action="{{ route('calculator.update', $quote->public_token) }}" method="POST">
                     @csrf @method('PUT')
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label small fw-semibold">Client Name</label>
+                            <label class="form-label small fw-semibold">Business Name</label>
                             <input type="text" class="form-control form-control-sm" name="client_name"
-                                   value="{{ $quote->client_name }}">
+                                   value="{{ $quote->client_name }}" {{ $isEditable ? '' : 'disabled' }}>
                         </div>
                         {{-- Quote type is locked to 'web' for the public calculator --}}
                         <input type="hidden" name="template_type" value="web">
                         <div class="col-md-6">
-                            <label class="form-label small fw-semibold">Your Name</label>
-                            <input type="text" class="form-control form-control-sm" name="salesperson_name"
-                                   value="{{ $quote->salesperson_name }}">
+                            <label class="form-label small fw-semibold">Contact Name</label>
+                            <input type="text" class="form-control form-control-sm" name="client_contact_name"
+                                   value="{{ $quote->client_contact_name }}" {{ $isEditable ? '' : 'disabled' }}>
                         </div>
                         <div class="col-md-6">
-                            <label class="form-label small fw-semibold">Your Email</label>
-                            <input type="email" class="form-control form-control-sm" name="salesperson_email"
-                                   value="{{ $quote->salesperson_email }}">
+                            <label class="form-label small fw-semibold">Contact Email</label>
+                            <input type="email" class="form-control form-control-sm" name="client_contact_email"
+                                   value="{{ $quote->client_contact_email }}" {{ $isEditable ? '' : 'disabled' }}>
                         </div>
-                        <div class="col-12 text-end">
-                            <button type="submit" class="btn btn-outline-primary btn-sm">
-                                <i class="bi bi-save me-1"></i> Save Details
-                            </button>
-                        </div>
+                        @if($isEditable)
+                            <div class="col-12 text-end">
+                                <button type="submit" class="btn btn-outline-primary btn-sm">
+                                    <i class="bi bi-save me-1"></i> Save Details
+                                </button>
+                            </div>
+                        @endif
                     </div>
                 </form>
             </div>
         </div>
 
         {{-- Phase Tabs --}}
-        <div class="card border-0 shadow-sm">
+        <div class="card border-0 shadow-sm phase-builder-card">
             <div class="card-header bg-transparent border-bottom p-0">
                 <ul class="nav nav-tabs border-0 px-3 pt-2" id="phaseTabs" role="tablist">
                     @foreach($quote->phases as $index => $phase)
@@ -88,6 +146,15 @@
 
             <div class="tab-content p-3">
                 @foreach($quote->phases as $index => $phase)
+                @php
+                    $phaseCategories = [
+                        'design'      => ['design'],
+                        'development' => ['dev'],
+                        'plugins_pm'  => ['plugin', 'pm'],
+                    ];
+                    $allowedCats = $phaseCategories[$phase->type] ?? [];
+                    $phaseTemplates = $templates->filter(fn($items, $cat) => in_array($cat, $allowedCats));
+                @endphp
                 <div class="tab-pane fade {{ $index === 0 ? 'show active' : '' }}"
                      id="phase-{{ $phase->id }}" role="tabpanel">
 
@@ -105,7 +172,9 @@
                                     <th style="width:60px;">Curr</th>
                                     <th style="width:55px;" class="text-center">Plugin</th>
                                     <th style="width:95px;" class="text-end">Total</th>
-                                    <th style="width:80px;"></th>
+                                    @if($isEditable)
+                                        <th style="width:80px;"></th>
+                                    @endif
                                 </tr>
                             </thead>
                             <tbody>
@@ -129,7 +198,20 @@
                                             —
                                         @endif
                                     </td>
-                                    <td class="text-muted small">{{ !in_array($item->calculation_type, ['fixed','percentage']) ? $item->quantity : '—' }}</td>
+                                    <td class="text-muted small">
+                                        @if($isEditable && !in_array($item->calculation_type, ['fixed','percentage']))
+                                            <form action="{{ route('calculator.items.qty', [$quote->public_token, $item->id]) }}" method="POST" class="d-flex">
+                                                @csrf @method('PATCH')
+                                                <input type="number" name="quantity" step="1" min="0"
+                                                       value="{{ number_format($item->quantity, 0) }}"
+                                                       class="form-control form-control-sm p-0 text-center border-0 bg-transparent"
+                                                       style="width:55px;"
+                                                       onchange="this.form.submit()">
+                                            </form>
+                                        @else
+                                            —
+                                        @endif
+                                    </td>
                                     <td class="text-muted small">{{ $item->percentage_value ? $item->percentage_value . '%' : '—' }}</td>
                                     <td class="text-muted small">{{ $item->currency ?? 'ZAR' }}</td>
                                     <td class="text-center">
@@ -140,6 +222,7 @@
                                         @endif
                                     </td>
                                     <td class="text-end fw-semibold small">{{ format_money($item->total) }}</td>
+                                    @if($isEditable)
                                     <td class="text-end">
                                         <div class="btn-group" role="group">
                                             {{-- Move to another phase --}}
@@ -147,6 +230,7 @@
                                                 <button type="button"
                                                         class="btn btn-sm btn-outline-secondary py-0 px-1 dropdown-toggle"
                                                         data-bs-toggle="dropdown"
+                                                        data-bs-popper-config='{"strategy":"fixed"}'
                                                         title="Move to phase">
                                                     <i class="bi bi-arrow-left-right" style="font-size:.85rem;"></i>
                                                 </button>
@@ -181,6 +265,7 @@
                                             </button>
                                         </div>
                                     </td>
+                                    @endif
                                 </tr>
                                 @endforeach
                             </tbody>
@@ -191,6 +276,7 @@
                     @endif
 
                     {{-- Add from template --}}
+                    @if($isEditable)
                     <div class="mt-3">
                         <form action="{{ route('calculator.items.store', $quote->public_token) }}"
                               method="POST" id="add-form-{{ $phase->id }}">
@@ -206,11 +292,11 @@
                             <input type="hidden" name="is_plugin"        id="h-plugin-{{ $phase->id }}" value="0">
                             <input type="hidden" name="notes"            id="h-notes-{{ $phase->id }}">
 
-                            <div class="input-group">
-                                <select class="form-select form-select-sm"
+                            <div class="input-group template-picker-group">
+                                <select class="form-select form-select-sm template-picker-select"
                                         onchange="pickTemplate(this, {{ $phase->id }})">
-                                    <option value="">— add item from template —</option>
-                                    @foreach($templates as $cat => $items)
+                                    <option value="">— add line item —</option>
+                                    @foreach($phaseTemplates as $cat => $items)
                                         <optgroup label="{{ ucfirst($cat) }}">
                                             @foreach($items as $tpl)
                                                 <option value="{{ $tpl->id }}"
@@ -234,6 +320,7 @@
                             </div>
                         </form>
                     </div>
+                    @endif
 
                 </div>
                 @endforeach
@@ -271,17 +358,43 @@
                     </tbody>
                 </table>
             </div>
-            <div class="card-footer bg-transparent">
-                <form action="{{ route('calculator.recalculate', $quote->public_token) }}" method="POST" class="mb-2">
-                    @csrf
-                    <button type="submit" class="btn btn-success w-100 fw-semibold">
-                        <i class="bi bi-arrow-repeat me-1"></i> Recalculate
-                    </button>
-                </form>
-                <a href="{{ route('calculator.pdf', $quote->public_token) }}"
+            <div class="card-footer bg-transparent row gx-2">
+                @if($isEditable)
+                <div class="col-6">
+                    <form action="{{ route('calculator.recalculate', $quote->public_token) }}" method="POST" class="mb-2">
+                        @csrf
+                        <button type="submit" class="btn btn-success w-100 fw-semibold">
+                            <i class="bi bi-arrow-repeat me-1"></i> Update Totals
+                        </button>
+                    </form>
+                </div>
+                <div class="col-6">
+                    <form action="{{ route('calculator.submit', $quote->public_token) }}" method="POST"
+                          onsubmit="return confirm('Submit this quote for review? You will not be able to make further changes.')">
+                        @csrf
+                        <button type="submit" class="btn btn-primary w-100 fw-semibold">
+                            <i class="bi bi-send me-1"></i> Submit for Review
+                        </button>
+                    </form>
+                </div>
+                @else
+                <div class="col-12">
+                    <div class="text-muted small">Status: {{ \App\Models\Quote::statuses()[$quote->status] ?? $quote->status }}</div>
+                    @if($quote->status === 'sent_to_client')
+                        <form action="{{ route('calculator.approve', $quote->public_token) }}" method="POST" class="mt-2"
+                              onsubmit="return confirm('Approve this quote?')">
+                            @csrf
+                            <button type="submit" class="btn btn-primary w-100 fw-semibold">
+                                <i class="bi bi-check2-circle me-1"></i> Approve Quote
+                            </button>
+                        </form>
+                    @endif
+                </div>
+                @endif
+                {{-- <a href="{{ route('calculator.pdf', $quote->public_token) }}"
                    class="btn btn-outline-dark w-100">
                     <i class="bi bi-file-earmark-pdf me-1"></i> Download PDF
-                </a>
+                </a> --}}
             </div>
         </div>
 
@@ -290,7 +403,7 @@
             <div class="card-body py-2 px-3 d-flex align-items-center gap-2">
                 <i class="bi bi-bookmark-star text-primary fs-5"></i>
                 <div>
-                    <div class="small fw-semibold">Bookmark this page</div>
+                    <div class="small fw-semibold">Bookmark this quote</div>
                     <div class="text-muted" style="font-size:.75rem;">Your quote link is unique — bookmark it to return.</div>
                 </div>
             </div>
@@ -313,6 +426,18 @@ document.addEventListener('DOMContentLoaded', function () {
             bootstrap.Tab.getOrCreateInstance(target).show();
         }
     }
+
+    // choices js for template pickers
+    document.querySelectorAll('select.template-picker-select').forEach(function(select) {
+        new Choices(select, {
+            searchEnabled: true,
+            itemSelectText: '',
+            placeholder: true,
+            placeholderValue: '— add line item —',
+            searchPlaceholderValue: 'Type to search...',
+            shouldSort: false,
+        });
+    });
 });
 
 function pickTemplate(select, phaseId) {

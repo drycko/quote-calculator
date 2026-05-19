@@ -25,7 +25,7 @@ class LineItemController extends Controller
         ]);
 
         $phase = Phase::with('quote')->findOrFail($data['phase_id']);
-        abort_if($phase->quote->user_id !== auth()->id(), 403);
+        abort_if($phase->quote->user_id !== auth()->id() && !auth()->user()->hasRole('administrator'), 403);
 
         $data['is_plugin'] = (bool) ($data['is_plugin'] ?? false);
         $data['quantity']  = $data['quantity'] ?? 1;
@@ -44,7 +44,7 @@ class LineItemController extends Controller
     {
         $phase   = $lineItem->phase;
         $quote   = $phase->quote;
-        abort_if($quote->user_id !== auth()->id(), 403);
+        abort_if($quote->user_id !== auth()->id() && !auth()->user()->hasRole('administrator'), 403);
 
         $phaseId = $phase->id;
         $lineItem->delete();
@@ -56,11 +56,39 @@ class LineItemController extends Controller
         )->with('success', 'Line item removed.');
     }
 
+    public function update(Request $request, LineItem $lineItem, QuoteCalculator $calculator)
+    {
+        $phase = $lineItem->phase;
+        $quote = $phase->quote;
+        abort_if($quote->user_id !== auth()->id() && !auth()->user()->hasRole('administrator'), 403);
+
+        $data = $request->validate([
+            'name'             => ['required', 'string', 'max:255'],
+            'calculation_type' => ['required', 'in:fixed,hourly,percentage,converted'],
+            'rate'             => ['nullable', 'numeric', 'min:0'],
+            'quantity'         => ['nullable', 'numeric', 'min:0'],
+            'percentage_value' => ['nullable', 'numeric', 'min:0', 'max:100'],
+            'currency'         => ['nullable', 'string', 'max:10'],
+            'conversion_rate'  => ['nullable', 'numeric', 'min:0'],
+            'is_plugin'        => ['nullable', 'boolean'],
+            'notes'            => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $data['is_plugin'] = (bool) ($data['is_plugin'] ?? false);
+
+        $lineItem->update($data);
+        $calculator->calculate($quote);
+
+        return redirect(
+            route('quotes.edit', $quote->id) . '#phase-' . $phase->id
+        )->with('success', 'Line item updated.');
+    }
+
     public function move(Request $request, LineItem $lineItem, QuoteCalculator $calculator)
     {
         $phase = $lineItem->phase;
         $quote = $phase->quote;
-        abort_if($quote->user_id !== auth()->id(), 403);
+        abort_if($quote->user_id !== auth()->id() && !auth()->user()->hasRole('administrator'), 403);
 
         $data = $request->validate([
             'phase_id' => ['required', 'integer', 'exists:phases,id'],

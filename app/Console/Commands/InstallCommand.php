@@ -19,7 +19,7 @@ class InstallCommand extends Command
     public function handle(): int
     {
         // Ensure all roles exist (idempotent — safe to run even if already seeded)
-        $roles = ['support', 'admin', 'manager', 'stock_controller'];
+        $roles = ['subscriber', 'contributor', 'author', 'editor', 'administrator'];
         foreach ($roles as $role) {
             Role::firstOrCreate(['name' => $role, 'guard_name' => 'web']);
         }
@@ -39,7 +39,7 @@ class InstallCommand extends Command
             'password' => Hash::make($password),
         ]);
 
-        $user->assignRole('admin');
+        $user->assignRole('administrator');
 
         $this->info("Admin user created: {$email}");
 

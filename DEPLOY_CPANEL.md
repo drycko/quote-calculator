@@ -1,4 +1,4 @@
-# Swift Steel — cPanel Deployment Guide
+# Laravel — cPanel Deployment Guide
 
 **For:** cPanel VPS with CGI/SSH shell access, no sudo privileges.  
 PHP extensions managed via cPanel → **Select PHP Version**.
@@ -54,13 +54,13 @@ If `php` points to the right version, you're fine. Otherwise note the full path 
 ## 3. Create the MySQL Database
 
 1. cPanel → **Databases → MySQL Databases**
-2. Create a database, e.g. `cpanelusername_swiftsteel`
-3. Create a user, e.g. `cpanelusername_ssapp` with a strong password
+2. Create a database, e.g. `cpanelusername_appdb`
+3. Create a user, e.g. `cpanelusername_appuser` with a strong password
 4. Add the user to the database → grant **ALL PRIVILEGES**
 
 Note down:
-- Database name: `cpanelusername_swiftsteel`
-- Username: `cpanelusername_ssapp`
+- Database name: `cpanelusername_appdb`
+- Username: `cpanelusername_appuser`
 - Password: `your-password`
 - Host: `localhost`
 
@@ -106,7 +106,7 @@ nano ~/.ssh/config
 
 Add:
 ```
-Host swiftsteel
+Host myapp
     HostName      your.server.ip.or.cpanel.domain
     User          cpanelusername
     Port          22
@@ -117,7 +117,7 @@ Host swiftsteel
 
 Test:
 ```bash
-ssh swiftsteel
+ssh myapp
 ```
 
 ---
@@ -126,7 +126,7 @@ ssh swiftsteel
 
 ```bash
 # From the project root on your local machine:
-scp server-deploy.sh swiftsteel:~/
+scp server-deploy.sh myapp:~/
 ```
 
 > This only needs to be done once. The script lives on the server permanently and handles every future deployment.
@@ -143,10 +143,10 @@ The zip now includes `.env.production` — the installer reads it, writes the fi
 
 # Upload and run on server
 # If 'php' already resolves to 8.2 on your server:
-ssh swiftsteel 'bash ~/server-deploy.sh ~/deploy_YYYYMMDD_HHMMSS.zip'
+ssh myapp 'bash ~/server-deploy.sh ~/deploy_YYYYMMDD_HHMMSS.zip'
 
 # If you need to specify the PHP binary explicitly:
-ssh swiftsteel 'PHP_BIN=/opt/cpanel/ea-php82/root/usr/bin/php bash ~/server-deploy.sh ~/deploy_YYYYMMDD_HHMMSS.zip'
+ssh myapp 'PHP_BIN=/opt/cpanel/ea-php82/root/usr/bin/php bash ~/server-deploy.sh ~/deploy_YYYYMMDD_HHMMSS.zip'
 ```
 
 Or build and deploy in one command:
@@ -187,7 +187,7 @@ cPanel provides an outgoing mail server. Use these settings in the installer (St
 | Username | `noreply@yourdomain.com` (a cPanel email account) |
 | Password | password for that email account |
 | From Address | `noreply@yourdomain.com` |
-| From Name | Swift Steel |
+| From Name | Your App Name |
 
 To create the email account: cPanel → **Email → Email Accounts → Create**.
 
@@ -210,8 +210,8 @@ That's it. The script will:
 Or manually if you need to specify the PHP binary:
 ```bash
 ./deploy.sh
-scp deployment/deploy_*.zip swiftsteel:~/
-ssh swiftsteel 'PHP_BIN=/opt/cpanel/ea-php82/root/usr/bin/php bash ~/server-deploy.sh ~/deploy_YYYYMMDD_HHMMSS.zip'
+scp deployment/deploy_*.zip myapp:~/
+ssh myapp 'PHP_BIN=/opt/cpanel/ea-php82/root/usr/bin/php bash ~/server-deploy.sh ~/deploy_YYYYMMDD_HHMMSS.zip'
 ```
 
 ---

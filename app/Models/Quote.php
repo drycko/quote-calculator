@@ -10,8 +10,12 @@ class Quote extends Model
 {
     protected $fillable = [
         'user_id',
+        'quote_number',
         'public_token',
+        'status',
         'client_name',
+        'client_contact_name',
+        'client_contact_email',
         'salesperson_name',
         'salesperson_email',
         'template_type',
@@ -42,6 +46,35 @@ class Quote extends Model
             'snapshot'       => 'array',
             'apply_markup'   => 'boolean',
             'apply_vat'      => 'boolean',
+        ];
+    }
+
+    protected static function booted(): void
+    {
+        static::created(function (Quote $quote): void {
+            if ($quote->quote_number) {
+                return;
+            }
+
+            $quote->forceFill([
+                'quote_number' => 'W-EST-' . str_pad((string) $quote->id, 4, '0', STR_PAD_LEFT),
+            ])->saveQuietly();
+        });
+    }
+
+    public function isPublicEditable(): bool
+    {
+        return $this->status === 'draft';
+    }
+
+    public static function statuses(): array
+    {
+        return [
+            'draft' => 'Draft',
+            'in_review' => 'In Review',
+            'sent_to_client' => 'Sent to Client',
+            'approved' => 'Approved',
+            'converted' => 'Converted to Invoice',
         ];
     }
 

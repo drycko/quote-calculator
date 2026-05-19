@@ -1,7 +1,7 @@
 <?php
 /**
  * ─────────────────────────────────────────────────────────────────────────────
- * Swift Steel — Web Installer
+ * Laravel — Web Installer
  *
  * Access this file at: https://yourdomain.com/install.php
  *
@@ -9,8 +9,47 @@
  * Do NOT edit these constants manually.
  * ─────────────────────────────────────────────────────────────────────────────
  */
-define('APP_ROOT',       '__APP_ROOT__');
-define('PERSISTENT_DIR', '__PERSISTENT_DIR__');
+function resolveAppRoot(string $path): string {
+    if ($path !== '__APP_ROOT__') {
+        return $path;
+    }
+
+    // cPanel priority: public_html/index.php is rewritten by server-deploy.sh to
+    // point at the active deploy_YYYYMMDD_HHMMSS folder.
+    $indexFile = __DIR__ . '/index.php';
+    if (is_file($indexFile)) {
+        $index = (string) file_get_contents($indexFile);
+        if (preg_match("#__DIR__\s*\.\s*['\"]/\.\./([^'\"]+)/vendor/autoload\.php['\"]#", $index, $matches)) {
+            $candidate = dirname(__DIR__) . '/' . $matches[1];
+            if (is_file($candidate . '/artisan')) {
+                return $candidate;
+            }
+        }
+    }
+
+    $directRoot = dirname(__DIR__);
+    if (is_file($directRoot . '/artisan')) {
+        return $directRoot;
+    }
+
+    $currentRoot = dirname(__DIR__) . '/current';
+    if (is_file($currentRoot . '/artisan')) {
+        return $currentRoot;
+    }
+
+    return $path;
+}
+
+function resolvePersistentDir(string $path): string {
+    if ($path !== '__PERSISTENT_DIR__') {
+        return $path;
+    }
+
+    return dirname(__DIR__) . '/persistent_storage';
+}
+
+define('APP_ROOT',       resolveAppRoot('__APP_ROOT__'));
+define('PERSISTENT_DIR', resolvePersistentDir('__PERSISTENT_DIR__'));
 define('LOCK_FILE',      PERSISTENT_DIR . '/installed');
 define('ENV_FILE',       APP_ROOT . '/.env');
 define('ENV_EXAMPLE',    APP_ROOT . '/.env.example');
@@ -24,6 +63,7 @@ if (file_exists(LOCK_FILE)) {
 // ── Bootstrap ─────────────────────────────────────────────────────────────────
 ini_set('display_errors', '0');
 error_reporting(E_ALL);
+@set_time_limit(7200);
 session_start();
 
 if (empty($_SESSION['_ins_csrf'])) {
@@ -39,11 +79,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+function canUseExec(): bool {
+    if (!function_exists('exec')) {
+        return false;
+    }
+
+    $disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
+
+    return !in_array('exec', $disabled, true);
+}
+
+function canUseShellArtisan(): bool {
+    if (!canUseExec()) {
+        return false;
+    }
+
+    $binary = strtolower((string) PHP_BINARY);
+
+    return PHP_SAPI === 'cli' && !str_contains($binary, 'php-fpm');
+}
+
 function artisan(string $cmd): array {
+    if (!canUseShellArtisan()) {
+        return artisanInternal($cmd);
+    }
+
     $php = escapeshellarg(PHP_BINARY);
     $art = escapeshellarg(APP_ROOT . '/artisan');
     exec("{$php} {$art} {$cmd} 2>&1", $out, $code);
     return ['ok' => $code === 0, 'out' => implode("\n", $out)];
+}
+
+function artisanInternal(string $cmd): array {
+    $previousDir = getcwd();
+
+    try {
+        chdir(APP_ROOT);
+
+        require_once APP_ROOT . '/vendor/autoload.php';
+
+        $app = require APP_ROOT . '/bootstrap/app.php';
+        $kernel = $app->make(Illuminate\Contracts\Console\Kernel::class);
+        $kernel->bootstrap();
+
+        $input = new Symfony\Component\Console\Input\StringInput($cmd);
+        $output = new Symfony\Component\Console\Output\BufferedOutput();
+        $code = $kernel->handle($input, $output);
+        $kernel->terminate($input, $code);
+
+        return ['ok' => $code === 0, 'out' => trim($output->fetch())];
+    } catch (Throwable $e) {
+        return ['ok' => false, 'out' => $e->getMessage()];
+    } finally {
+        if ($previousDir !== false) {
+            chdir($previousDir);
+        }
+    }
 }
 
 function writeEnv(array $vals): bool {
@@ -63,10 +154,13 @@ function writeEnv(array $vals): bool {
         $quoted = (preg_match('/[\s#"\'\\\\$]/', $value) || $value === '')
             ? '"' . addcslashes($value, '"\\') . '"'
             : $value;
-        $pattern     = '/^(' . preg_quote($key, '/') . '\s*=).*/m';
-        $replacement = "$1{$quoted}";
+        $pattern = '/^(' . preg_quote($key, '/') . '\s*=).*/m';
         if (preg_match($pattern, $content)) {
-            $content = preg_replace($pattern, $replacement, $content);
+            $content = preg_replace_callback(
+                $pattern,
+                fn (array $matches): string => $matches[1] . $quoted,
+                $content
+            );
         } else {
             $content .= "\n{$key}={$quoted}";
         }
@@ -108,16 +202,53 @@ function testDb(string $host, int $port, string $db, string $user, string $pass)
     }
 }
 
+function ensureWritableDirectory(string $path): array {
+    if (!is_dir($path)) {
+        @mkdir($path, 0775, true);
+    }
+
+    foreach ([0775, 0777] as $mode) {
+        if (is_dir($path)) {
+            @chmod($path, $mode);
+        }
+
+        clearstatcache(true, $path);
+
+        if (is_dir($path) && is_writable($path)) {
+            return [
+                true,
+                'Writable (' . substr(sprintf('%o', fileperms($path)), -4) . ')',
+            ];
+        }
+    }
+
+    return [
+        false,
+        'Not writable: ' . $path,
+    ];
+}
+
 function requirements(): array {
     $checks = [];
     $checks[] = ['PHP &ge; 8.2',             version_compare(PHP_VERSION, '8.2', '>='), PHP_VERSION];
     foreach (['pdo_mysql', 'mbstring', 'openssl', 'fileinfo', 'xml', 'curl'] as $ext) {
         $checks[] = ["ext-{$ext}", extension_loaded($ext), extension_loaded($ext) ? 'Loaded' : 'Missing'];
     }
-    $execOk = function_exists('exec') && !str_contains((string) ini_get('disable_functions'), 'exec');
-    $checks[] = ['exec() enabled',         $execOk,                                           $execOk ? 'Yes' : 'Disabled'];
-    $checks[] = ['storage/ writable',      is_writable(APP_ROOT . '/storage'),               is_writable(APP_ROOT . '/storage') ? 'Writable' : 'Not writable'];
-    $checks[] = ['bootstrap/cache/ writable', is_writable(APP_ROOT . '/bootstrap/cache'),   is_writable(APP_ROOT . '/bootstrap/cache') ? 'Writable' : 'Not writable'];
+    $execOk = canUseExec();
+    $checks[] = ['Artisan runner',         true,                                              canUseShellArtisan() ? 'CLI shell' : 'Internal fallback'];
+
+    foreach ([
+        'storage/ writable' => APP_ROOT . '/storage',
+        'storage/framework/ writable' => APP_ROOT . '/storage/framework',
+        'storage/framework/sessions/ writable' => APP_ROOT . '/storage/framework/sessions',
+        'storage/framework/views/ writable' => APP_ROOT . '/storage/framework/views',
+        'storage/framework/cache/ writable' => APP_ROOT . '/storage/framework/cache',
+        'bootstrap/cache/ writable' => APP_ROOT . '/bootstrap/cache',
+    ] as $label => $path) {
+        [$ok, $message] = ensureWritableDirectory($path);
+        $checks[] = [$label, $ok, $message];
+    }
+
     return $checks;
 }
 
@@ -170,6 +301,9 @@ if (empty($d)) {
             'mail_encryption'   => 'MAIL_ENCRYPTION',
             'mail_from_address' => 'MAIL_FROM_ADDRESS',
             'mail_from_name'    => 'MAIL_FROM_NAME',
+            'mail_log_channel'   => 'MAIL_LOG_CHANNEL',
+            'mail_log_level'     => 'MAIL_LOG_LEVEL',
+            'mail_log_days'      => 'MAIL_LOG_DAILY_DAYS',
         ] as $field => $envKey) {
             if (isset($e[$envKey])) $d[$field] = $e[$envKey];
         }
@@ -183,7 +317,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $d['db_database']  = trim($_POST['db_database']  ?? '');
         $d['db_username']  = trim($_POST['db_username']  ?? '');
         $d['db_password']  = $_POST['db_password']       ?? '';
-        $d['app_name']     = trim($_POST['app_name']     ?? 'Swift Steel');
+        $d['app_name']     = trim($_POST['app_name']     ?? 'Laravel App');
         $d['app_url']      = rtrim(trim($_POST['app_url'] ?? ''), '/');
         $d['app_timezone'] = $_POST['app_timezone']      ?? 'Africa/Johannesburg';
 
@@ -205,6 +339,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $d['mail_encryption']   = $_POST['mail_encryption']   ?? 'tls';
         $d['mail_from_address'] = trim($_POST['mail_from_address'] ?? '');
         $d['mail_from_name']    = trim($_POST['mail_from_name']    ?? ($d['app_name'] ?? ''));
+        $d['mail_log_channel']  = trim($_POST['mail_log_channel']  ?? 'mail');
+        $d['mail_log_level']    = trim($_POST['mail_log_level']    ?? 'debug');
+        $d['mail_log_days']     = (int) ($_POST['mail_log_days']   ?? 14);
         $step = 4;
     } elseif ($step === 4) {
         $d['admin_name']     = trim($_POST['admin_name']     ?? '');
@@ -248,6 +385,9 @@ if ($step === 5 && !empty($d['db_host'])) {
         'MAIL_ENCRYPTION'   => $d['mail_encryption'],
         'MAIL_FROM_ADDRESS' => $d['mail_from_address'],
         'MAIL_FROM_NAME'    => $d['mail_from_name'],
+        'MAIL_LOG_CHANNEL'  => $d['mail_log_channel'] ?? 'mail',
+        'MAIL_LOG_LEVEL'    => $d['mail_log_level'] ?? 'debug',
+        'MAIL_LOG_DAILY_DAYS' => $d['mail_log_days'] ?? 14,
         // App-specific
         'APP_CURRENCY'           => 'ZAR',
         'DEFAULT_CONVERSION_RATE'=> '18.50',
@@ -320,7 +460,7 @@ $stepLabels = [1 => 'Requirements', 2 => 'Database', 3 => 'Mail', 4 => 'Admin Ac
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Swift Steel — Installer</title>
+<title>NexusFlow — Installer</title>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -433,7 +573,7 @@ a { color: var(--orange); }
 
   <!-- Sidebar -->
   <aside class="sidebar">
-    <div class="brand">Swift <span>Steel</span></div>
+    <div class="brand">NexusFlow <span>Installer</span></div>
     <nav>
       <?php foreach ($stepLabels as $n => $label): ?>
         <?php
@@ -527,7 +667,7 @@ a { color: var(--orange); }
 
         <div class="field">
           <label>Application Name</label>
-          <input type="text" name="app_name" value="<?= htmlspecialchars($d['app_name'] ?? 'Swift Steel') ?>">
+          <input type="text" name="app_name" value="<?= htmlspecialchars($d['app_name'] ?? 'Laravel App') ?>">
         </div>
         <div class="field">
           <label>Application URL</label>
@@ -621,6 +761,28 @@ a { color: var(--orange); }
           </div>
         </div>
 
+        <div id="mail-log-fields">
+          <div class="row2">
+            <div class="field">
+              <label>Mail Log Channel</label>
+              <input type="text" name="mail_log_channel" value="<?= htmlspecialchars($d['mail_log_channel'] ?? 'mail') ?>">
+              <small>Use `mail` to write log emails to storage/logs/mail-YYYY-MM-DD.log.</small>
+            </div>
+            <div class="field">
+              <label>Mail Log Level</label>
+              <select name="mail_log_level">
+                <?php foreach (['debug', 'info', 'notice', 'warning', 'error', 'critical'] as $level): ?>
+                <option value="<?= $level ?>" <?= ($d['mail_log_level'] ?? 'debug') === $level ? 'selected' : '' ?>><?= ucfirst($level) ?></option>
+                <?php endforeach; ?>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label>Mail Log Retention Days</label>
+            <input type="number" min="1" name="mail_log_days" value="<?= htmlspecialchars($d['mail_log_days'] ?? '14') ?>">
+          </div>
+        </div>
+
         <div class="row2">
           <div class="field">
             <label>From Address</label>
@@ -643,7 +805,11 @@ a { color: var(--orange); }
     (function(){
         var sel = document.getElementById('mailer-select');
         var smtp = document.getElementById('smtp-fields');
-        function toggle() { smtp.style.display = ['smtp'].includes(sel.value) ? '' : 'none'; }
+        var log = document.getElementById('mail-log-fields');
+        function toggle() {
+            smtp.style.display = ['smtp'].includes(sel.value) ? '' : 'none';
+            log.style.display = sel.value === 'log' ? '' : 'none';
+        }
         sel.addEventListener('change', toggle);
         toggle();
     })();
@@ -700,7 +866,7 @@ a { color: var(--orange); }
       <div class="success-box">
         <div class="checkmark">✅</div>
         <h2>Installation Complete</h2>
-        <p>Swift Steel has been installed successfully.<br>This installer file has been removed.</p>
+        <p>Installation completed successfully.<br>This installer file has been removed.</p>
         <a href="<?= htmlspecialchars($d['app_url'] ?? '/') ?>/admin" class="btn btn-primary" style="font-size:15px;padding:12px 28px;">
           Go to Admin Panel &rarr;
         </a>

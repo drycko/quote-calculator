@@ -42,7 +42,7 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="client_name" class="form-label fw-semibold">Client Name</label>
+                        <label for="client_name" class="form-label fw-semibold">Client Business Name</label>
                         <input type="text" class="form-control @error('client_name') is-invalid @enderror"
                                id="client_name" name="client_name"
                                value="{{ old('client_name') }}" placeholder="e.g. Acme Corp">
@@ -51,24 +51,46 @@
                         @enderror
                     </div>
 
-                    <div class="mb-3">
-                        <label for="salesperson_name" class="form-label fw-semibold">Salesperson Name</label>
-                        <input type="text" class="form-control @error('salesperson_name') is-invalid @enderror"
-                               id="salesperson_name" name="salesperson_name"
-                               value="{{ old('salesperson_name') }}">
-                        @error('salesperson_name')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label for="client_contact_name" class="form-label fw-semibold">Client Contact Name</label>
+                            <input type="text" class="form-control @error('client_contact_name') is-invalid @enderror"
+                                   id="client_contact_name" name="client_contact_name"
+                                   value="{{ old('client_contact_name') }}">
+                            @error('client_contact_name')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-md-6">
+                            <label for="client_contact_email" class="form-label fw-semibold">Client Contact Email</label>
+                            <input type="email" class="form-control @error('client_contact_email') is-invalid @enderror"
+                                   id="client_contact_email" name="client_contact_email"
+                                   value="{{ old('client_contact_email') }}">
+                            @error('client_contact_email')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
                     </div>
 
-                    <div class="mb-4">
-                        <label for="salesperson_email" class="form-label fw-semibold">Salesperson Email</label>
-                        <input type="email" class="form-control @error('salesperson_email') is-invalid @enderror"
-                               id="salesperson_email" name="salesperson_email"
-                               value="{{ old('salesperson_email') }}">
-                        @error('salesperson_email')
-                            <div class="invalid-feedback">{{ $message }}</div>
-                        @enderror
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label for="salesperson_name" class="form-label fw-semibold">Salesperson Name</label>
+                            <input type="text" class="form-control @error('salesperson_name') is-invalid @enderror"
+                                   id="salesperson_name" name="salesperson_name"
+                                   value="{{ old('salesperson_name', auth()->user()->name) }}">
+                            @error('salesperson_name')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
+                        <div class="col-md-6">
+                            <label for="salesperson_email" class="form-label fw-semibold">Salesperson Email</label>
+                            <input type="email" class="form-control @error('salesperson_email') is-invalid @enderror"
+                                   id="salesperson_email" name="salesperson_email"
+                                   value="{{ old('salesperson_email', auth()->user()->email) }}">
+                            @error('salesperson_email')
+                                <div class="invalid-feedback">{{ $message }}</div>
+                            @enderror
+                        </div>
                     </div>
 
                     <div class="d-flex gap-2">

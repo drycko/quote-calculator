@@ -163,7 +163,7 @@
             <div class="header-meta">
                 <div class="doc-title">QUOTE</div>
                 <div class="doc-ref">
-                    Ref: QUO-{{ str_pad($quote->id, 4, '0', STR_PAD_LEFT) }}
+                  Ref: {{ $quote->quote_number ?? ('EST-' . str_pad($quote->id, 4, '0', STR_PAD_LEFT)) }}
                     &nbsp;|&nbsp;
                     {{ $quote->created_at->format('d F Y') }}
                 </div>
@@ -176,9 +176,17 @@
         <tr>
             <td style="padding-right:12px;">
                 <div class="info-block">
-                    <div class="label">Prepared for</div>
-                    <div class="value">{{ $quote->client_name ?? '—' }}</div>
-                </div>
+                  <div class="label">Prepared for</div>
+                  <div class="value">{{ $quote->client_name ?? '—' }}</div>
+                  @if($quote->client_contact_name || $quote->client_contact_email)
+                      <div class="sub">
+                          {{ $quote->client_contact_name }}
+                          @if($quote->client_contact_email)
+                              {{ $quote->client_contact_name ? ' | ' : '' }}{{ $quote->client_contact_email }}
+                          @endif
+                      </div>
+                  @endif
+              </div>
             </td>
             <td style="padding-left:12px;">
                 <div class="info-block">

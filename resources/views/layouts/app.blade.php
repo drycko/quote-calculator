@@ -18,6 +18,14 @@
     <link href="{{ asset('vendor/tracklyt-bs5-theme/css/components.css') }}" rel="stylesheet">
     <link href="{{ asset('vendor/tracklyt-bs5-theme/css/utilities.css') }}" rel="stylesheet">
 
+    {{-- favicon --}}
+    <link rel="icon" type="image/x-icon" href="{{ asset('assets/favicon_io/favicon.ico') }}"/>
+    {{-- bootstrap icons --}}
+    <link rel="apple-touch-icon" sizes="180x180" href="{{ asset('assets/favicon_io/apple-touch-icon.png') }}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{{ asset('assets/favicon_io/favicon-32x32.png') }}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{{ asset('assets/favicon_io/favicon-16x16.png') }}">
+    <link rel="manifest" href="{{ asset('assets/favicon_io/site.webmanifest') }}">
+
     @stack('styles')
 </head>
 <body>
@@ -50,6 +58,10 @@
             </a>
 
             <div class="sidebar-section-header">Account</div>
+            <a href="{{ route('users.index') }}"
+               class="sidebar-nav-link {{ request()->routeIs('users.*') ? 'active' : '' }}">
+                <i class="bi bi-people me-2"></i>Users
+            </a>
 
             <a href="{{ route('logout') }}"
                class="sidebar-nav-link"

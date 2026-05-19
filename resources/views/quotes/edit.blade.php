@@ -4,6 +4,7 @@
 
 @section('content')
 
+@include('partials.choices-cdn')
 {{-- ── Header ─────────────────────────────────────────────── --}}
 <div class="d-flex justify-content-between align-items-start mb-4">
     <div>
@@ -15,8 +16,14 @@
         </nav>
         <h1 class="h3 mb-0">
             {{ $quote->client_name ?? 'Draft Quote' }}
+            <span class="badge bg-primary bg-opacity-10 text-primary ms-2" style="font-size:.65rem;vertical-align:middle;">
+                {{ $quote->quote_number }}
+            </span>
             <span class="badge bg-secondary bg-opacity-10 text-secondary text-uppercase ms-2" style="font-size:.65rem;vertical-align:middle;">
                 {{ $quote->template_type }}
+            </span>
+            <span class="badge bg-info bg-opacity-10 text-info ms-2" style="font-size:.65rem;vertical-align:middle;">
+                {{ \App\Models\Quote::statuses()[$quote->status] ?? $quote->status }}
             </span>
         </h1>
     </div>
@@ -58,7 +65,7 @@
                     @csrf @method('PUT')
                     <div class="row g-3">
                         <div class="col-md-6">
-                            <label class="form-label small fw-semibold">Client Name</label>
+                            <label class="form-label small fw-semibold">Client Business Name</label>
                             <input type="text" class="form-control form-control-sm" name="client_name"
                                    value="{{ $quote->client_name }}">
                         </div>
@@ -69,6 +76,26 @@
                                 <option value="manual" {{ $quote->template_type === 'manual' ? 'selected' : '' }}>Manual Adjust</option>
                                 <option value="ilead"  {{ $quote->template_type === 'ilead'  ? 'selected' : '' }}>iLead</option>
                             </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Status</label>
+                            <select class="form-select form-select-sm" name="status">
+                                @foreach(\App\Models\Quote::statuses() as $value => $label)
+                                    <option value="{{ $value }}" {{ $quote->status === $value ? 'selected' : '' }}>
+                                        {{ $label }}
+                                    </option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Client Contact Name</label>
+                            <input type="text" class="form-control form-control-sm" name="client_contact_name"
+                                   value="{{ $quote->client_contact_name }}">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Client Contact Email</label>
+                            <input type="email" class="form-control form-control-sm" name="client_contact_email"
+                                   value="{{ $quote->client_contact_email }}">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-semibold">Salesperson Name</label>
@@ -196,6 +223,7 @@
                                                 <button type="button"
                                                         class="btn btn-xs btn-sm btn-outline-secondary py-0 px-1 dropdown-toggle"
                                                         data-bs-toggle="dropdown"
+                                                        data-bs-popper-config='{"strategy":"fixed"}'
                                                         title="Move to phase">
                                                     <i class="bi bi-arrow-left-right" style="font-size:.85rem;"></i>
                                                 </button>
@@ -222,6 +250,12 @@
                                                     @endforeach
                                                 </ul>
                                             </div>
+                                            {{-- Edit --}}
+                                            <button type="button"
+                                                    class="btn btn-xs btn-sm btn-outline-primary"
+                                                    onclick="openEditModal({{ $item->id }}, {{ json_encode($item->only(['name','calculation_type','rate','quantity','percentage_value','currency','conversion_rate','is_plugin','notes'])) }})">
+                                                <i class="bi bi-pencil"></i>
+                                            </button>
                                             {{-- Delete --}}
                                             <button type="button"
                                                     class="btn btn-xs btn-sm btn-outline-danger"
@@ -248,14 +282,24 @@
                             @csrf
                             <input type="hidden" name="phase_id" value="{{ $phase->id }}">
 
+                            @php
+                                $phaseCategories = [
+                                    'design'      => ['design'],
+                                    'development' => ['dev'],
+                                    'plugins_pm'  => ['plugin', 'pm'],
+                                ];
+                                $allowedCats = $phaseCategories[$phase->type] ?? [];
+                                $phaseTemplates = $templates->filter(fn($items, $cat) => in_array($cat, $allowedCats));
+                            @endphp
+
                             <div class="row g-2 mb-2">
-                                {{-- Template picker --}}
+                                {{-- Line item picker --}}
                                 <div class="col-md-6">
-                                    <label class="form-label small">Load from template</label>
-                                    <select class="form-select form-select-sm" id="template-picker-{{ $phase->id }}"
+                                    <label class="form-label small">Load from line items</label>
+                                    <select class="form-select form-select-sm lineitem-picker-select" id="template-picker-{{ $phase->id }}"
                                             onchange="fillFromTemplate(this, {{ $phase->id }})">
-                                        <option value="">— pick a template —</option>
-                                        @foreach($templates as $cat => $items)
+                                        <option value="">— pick a line item —</option>
+                                        @foreach($phaseTemplates as $cat => $items)
                                             <optgroup label="{{ ucfirst($cat) }}">
                                                 @foreach($items as $tpl)
                                                     <option value="{{ $tpl->id }}"
@@ -394,13 +438,21 @@
                     </tbody>
                 </table>
             </div>
-            <div class="card-footer bg-transparent text-center">
-                <form action="{{ route('quotes.recalculate', $quote) }}" method="POST">
-                    @csrf
-                    <button type="submit" class="btn btn-success w-100">
-                        <i class="bi bi-arrow-repeat me-1"></i> Recalculate
+            <div class="card-footer bg-transparent text-center row">
+                <div class="col-6">
+                    <form action="{{ route('quotes.recalculate', $quote) }}" method="POST">
+                        @csrf
+                        <button type="submit" class="btn btn-success w-100">
+                            <i class="bi bi-arrow-repeat me-1"></i> Update Totals
+                        </button>
+                    </form>
+                </div>
+                <div class="col-6">
+                    <button type="button" class="btn btn-primary w-100"
+                            data-bs-toggle="modal" data-bs-target="#emailQuoteModal">
+                        <i class="bi bi-envelope me-1"></i> Email Client
                     </button>
-                </form>
+                </div>
             </div>
         </div>
 
@@ -412,12 +464,11 @@
             <div class="card-body p-0">
                 <table class="table table-sm mb-0 small">
                     <tbody>
-                        <tr><td class="ps-3 text-muted">R85 000+</td><td class="text-end pe-3">10%</td></tr>
-                        <tr><td class="ps-3 text-muted">R55 000 – R85 000</td><td class="text-end pe-3">12%</td></tr>
-                        <tr><td class="ps-3 text-muted">R35 500 – R55 000</td><td class="text-end pe-3">15%</td></tr>
-                        <tr><td class="ps-3 text-muted">R12 500 – R35 500</td><td class="text-end pe-3">18%</td></tr>
-                        <tr><td class="ps-3 text-muted">Below R12 500</td><td class="text-end pe-3">22.5%</td></tr>
-                        <tr class="table-light"><td class="ps-3 text-muted">Plugins (always)</td><td class="text-end pe-3">10%</td></tr>
+                        <tr><td class="ps-3 text-muted">R50 001 – R300 000</td><td class="text-end pe-3">15%</td></tr>
+                        <tr><td class="ps-3 text-muted">R30 001 – R50 000</td><td class="text-end pe-3">18%</td></tr>
+                        <tr><td class="ps-3 text-muted">R12 501 – R30 000</td><td class="text-end pe-3">22.5%</td></tr>
+                        <tr><td class="ps-3 text-muted">Below R12 500</td><td class="text-end pe-3">10%</td></tr>
+                        
                     </tbody>
                 </table>
             </div>
@@ -428,7 +479,134 @@
 
 </div>
 
+{{-- Email Quote Modal --}}
+<div class="modal fade" id="emailQuoteModal" tabindex="-1" aria-labelledby="emailQuoteModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form action="{{ route('quotes.email', $quote) }}" method="POST">
+                @csrf
+                <div class="modal-header">
+                    <h5 class="modal-title" id="emailQuoteModalLabel">Email Quote to Client</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Recipient Email</label>
+                            <input type="email" name="to_email"
+                                   class="form-control @error('to_email') is-invalid @enderror"
+                                   value="{{ old('to_email', $quote->client_contact_email) }}"
+                                   placeholder="client@example.com" required>
+                            @error('to_email')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-semibold">Subject</label>
+                            <input type="text" name="subject"
+                                   class="form-control @error('subject') is-invalid @enderror"
+                                   value="{{ old('subject', 'Your quote ' . $quote->quote_number) }}" required>
+                            @error('subject')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold">Message</label>
+                            <textarea name="message" rows="7"
+                                      class="form-control @error('message') is-invalid @enderror"
+                                      required>{{ old('message', "Hi " . ($quote->client_contact_name ?: $quote->client_name ?: 'there') . ",\n\nThank you for the opportunity to quote on your project. You can view and approve your quote using the secure link below.\n\nPlease let me know if you have any questions.") }}</textarea>
+                            @error('message')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-semibold">Quote Link</label>
+                            <input type="text" class="form-control form-control-sm"
+                                   value="{{ route('calculator.show', $quote->public_token) }}" readonly>
+                            <div class="form-text">
+                                Sending this email will mark the quote as Sent to Client unless it is already converted.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-send me-1"></i> Send Email
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 @endsection
+
+{{-- ── Edit Line Item Modal ──────────────────────────────────── --}}
+<div class="modal fade" id="editItemModal" tabindex="-1" aria-labelledby="editItemModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form id="editItemForm" method="POST">
+                @csrf @method('PUT')
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editItemModalLabel">Edit Line Item</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Name <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" name="name" id="ei-name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Calc Type</label>
+                            <select class="form-select" name="calculation_type" id="ei-calc">
+                                <option value="fixed">Fixed</option>
+                                <option value="hourly">Hourly</option>
+                                <option value="percentage">Percentage</option>
+                                <option value="converted">Converted</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Rate</label>
+                            <input type="number" step="0.01" class="form-control" name="rate" id="ei-rate" placeholder="0.00">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Qty</label>
+                            <input type="number" step="0.01" class="form-control" name="quantity" id="ei-qty">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">%</label>
+                            <input type="number" step="0.01" class="form-control" name="percentage_value" id="ei-pct" placeholder="0.00">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Currency</label>
+                            <select class="form-select" name="currency" id="ei-curr">
+                                <option value="ZAR">ZAR</option>
+                                <option value="USD">USD</option>
+                                <option value="EUR">EUR</option>
+                                <option value="GBP">GBP</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Conv. Rate</label>
+                            <input type="number" step="0.01" class="form-control" name="conversion_rate" id="ei-conv" placeholder="20">
+                        </div>
+                        <div class="col-md-3 d-flex align-items-end">
+                            <div class="form-check mb-1">
+                                <input type="hidden" name="is_plugin" value="0">
+                                <input class="form-check-input" type="checkbox" name="is_plugin" value="1" id="ei-plugin">
+                                <label class="form-check-label fw-semibold" for="ei-plugin">Plugin</label>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Notes</label>
+                            <input type="text" class="form-control" name="notes" id="ei-notes" placeholder="Optional">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary"><i class="bi bi-check me-1"></i> Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 
 @push('scripts')
 <script>
@@ -441,6 +619,18 @@ document.addEventListener('DOMContentLoaded', function () {
             bootstrap.Tab.getOrCreateInstance(target).show();
         }
     }
+    
+    // choices js for lineitem pickers
+    document.querySelectorAll('select.lineitem-picker-select').forEach(function(select) {
+        new Choices(select, {
+            searchEnabled: true,
+            itemSelectText: '',
+            placeholder: true,
+            placeholderValue: '— add line item —',
+            searchPlaceholderValue: 'Type to search...',
+            shouldSort: false,
+        });
+    });
 });
 
 function fillFromTemplate(select, phaseId) {
@@ -464,6 +654,28 @@ function fillFromTemplate(select, phaseId) {
     }
 
     document.getElementById('plugin-' + phaseId).checked = (opt.dataset.plugin === '1');
+}
+
+function openEditModal(id, data) {
+    const form = document.getElementById('editItemForm');
+    form.action = '/line-items/' + id;
+
+    document.getElementById('ei-name').value  = data.name        ?? '';
+    document.getElementById('ei-rate').value  = data.rate        ?? '';
+    document.getElementById('ei-qty').value   = data.quantity    ?? '';
+    document.getElementById('ei-pct').value   = data.percentage_value ?? '';
+    document.getElementById('ei-conv').value  = data.conversion_rate  ?? '';
+    document.getElementById('ei-notes').value = data.notes       ?? '';
+
+    const calcSel = document.getElementById('ei-calc');
+    for (let o of calcSel.options) o.selected = (o.value === data.calculation_type);
+
+    const currSel = document.getElementById('ei-curr');
+    for (let o of currSel.options) o.selected = (o.value === (data.currency || 'ZAR'));
+
+    document.getElementById('ei-plugin').checked = (data.is_plugin == 1 || data.is_plugin === true);
+
+    bootstrap.Modal.getOrCreateInstance(document.getElementById('editItemModal')).show();
 }
 
 function deleteItem(id) {

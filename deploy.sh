@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Usage: ./deploy.sh [--deploy]
 #   --deploy   After building the zip, upload it to the server and run server-deploy.sh via SSH.
-#              Requires the SSH alias 'swiftsteel' to be configured in ~/.ssh/config,
+#              Requires the SSH alias 'youralias' to be configured in ~/.ssh/config,
 #              and ~/server-deploy.sh to exist on the server.
 
 # Parse flags
@@ -12,7 +12,7 @@ for arg in "$@"; do
     [[ "$arg" == "--deploy" ]] && DEPLOY_TO_SERVER=true
 done
 
-SSH_HOST="${SSH_ALIAS:-swiftsteel}"
+SSH_HOST="${SSH_ALIAS:-youralias}"
 
 # Get the project root directory
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
@@ -56,7 +56,6 @@ zip -r "$ZIP_PATH" . \
      "storage/debugbar/*" \
      "storage/logs/*" \
      ".env" \
-     ".env.example" \
      ".env.backup" \
      ".env.testing" \
      ".gitignore" \

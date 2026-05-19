@@ -19,13 +19,51 @@
         </div>
     </div>
 @else
+    {{-- Filters --}}
+    <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body py-2">
+            <form method="GET" action="{{ route('quotes.index') }}" class="row g-2 align-items-end">
+                <div class="col-md-3">
+                    <label class="form-label small mb-1">Status</label>
+                    <select name="status" class="form-select form-select-sm">
+                        <option value="">All statuses</option>
+                        @foreach(\App\Models\Quote::statuses() as $val => $label)
+                            <option value="{{ $val }}" {{ request('status') === $val ? 'selected' : '' }}>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small mb-1">Template</label>
+                    <select name="template_type" class="form-select form-select-sm">
+                        <option value="">All templates</option>
+                        @foreach(['web' => 'Web', 'manual' => 'Manual Adjust', 'ilead' => 'iLead'] as $val => $label)
+                            <option value="{{ $val }}" {{ request('template_type') === $val ? 'selected' : '' }}>{{ $label }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label small mb-1">Search</label>
+                    <input type="text" name="search" class="form-control form-control-sm"                           placeholder="Client name, quote number…" value="{{ request('search') }}">
+                </div>
+                <div class="col-auto d-flex gap-2">
+                    <button type="submit" class="btn btn-primary btn-sm">
+                        <i class="bi bi-funnel me-1"></i> Filter
+                    </button>
+                    <a href="{{ route('quotes.index') }}" class="btn btn-outline-secondary btn-sm">Clear</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
     <div class="card border-0 shadow-sm">
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0">
                 <thead class="table-light">
                     <tr>
-                        <th>#</th>
+                        <th>Quote</th>
                         <th>Client</th>
+                        <th>Status</th>
                         <th>Template</th>
                         <th>Salesperson</th>
                         <th class="text-end">Subtotal</th>
@@ -38,9 +76,22 @@
                 <tbody>
                     @foreach($quotes as $quote)
                     <tr>
-                        <td class="text-muted small">{{ $quote->id }}</td>
+                        <td class="text-muted small"><a href="{{ route('quotes.edit', $quote) }}" class="btn btn-xs btn-sm btn-outline-primary me-1">{{ $quote->quote_number }}</a></td>
                         <td>
                             <span class="fw-semibold">{{ $quote->client_name ?? '—' }}</span>
+                            @if($quote->client_contact_name || $quote->client_contact_email)
+                                <div class="text-muted small">
+                                    {{ $quote->client_contact_name ?? '' }}
+                                    @if($quote->client_contact_email)
+                                        <span>{{ $quote->client_contact_name ? ' · ' : '' }}{{ $quote->client_contact_email }}</span>
+                                    @endif
+                                </div>
+                            @endif
+                        </td>
+                        <td>
+                            <span class="badge bg-info bg-opacity-10 text-info" style="font-size:.7rem;">
+                                {{ \App\Models\Quote::statuses()[$quote->status] ?? $quote->status }}
+                            </span>
                         </td>
                         <td>
                             <span class="badge bg-secondary bg-opacity-10 text-secondary text-uppercase" style="font-size:.7rem;">

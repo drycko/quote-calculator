@@ -26,15 +26,16 @@ class CalculatorController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'client_name'       => ['nullable', 'string', 'max:255'],
-            'salesperson_name'  => ['nullable', 'string', 'max:255'],
-            'salesperson_email' => ['nullable', 'email', 'max:255'],
-            'template_type'     => ['required', 'in:web'],
+            'client_name'          => ['nullable', 'string', 'max:255'],
+            'client_contact_name'  => ['nullable', 'string', 'max:255'],
+            'client_contact_email' => ['nullable', 'email', 'max:255'],
+            'template_type'        => ['required', 'in:web'],
         ]);
 
         $quote = Quote::create([
             'public_token' => Str::uuid()->toString(),
             'user_id'      => null,
+            'status'       => 'draft',
             ...$validated,
         ]);
 
@@ -67,11 +68,13 @@ class CalculatorController extends Controller
     {
         $quote = Quote::where('public_token', $token)->firstOrFail();
 
+        $this->abortIfSubmitted($quote);
+
         $validated = $request->validate([
-            'client_name'       => ['nullable', 'string', 'max:255'],
-            'salesperson_name'  => ['nullable', 'string', 'max:255'],
-            'salesperson_email' => ['nullable', 'email', 'max:255'],
-            'template_type'     => ['required', 'in:web'],
+            'client_name'          => ['nullable', 'string', 'max:255'],
+            'client_contact_name'  => ['nullable', 'string', 'max:255'],
+            'client_contact_email' => ['nullable', 'email', 'max:255'],
+            'template_type'        => ['required', 'in:web'],
         ]);
 
         $quote->update($validated);
@@ -85,9 +88,35 @@ class CalculatorController extends Controller
     {
         $quote = Quote::where('public_token', $token)->firstOrFail();
 
+        $this->abortIfSubmitted($quote);
+
         $calculator->calculate($quote);
 
         return back()->with('success', 'Totals updated.');
+    }
+
+    public function submit(string $token, QuoteCalculator $calculator): RedirectResponse
+    {
+        $quote = Quote::where('public_token', $token)->firstOrFail();
+
+        $this->abortIfSubmitted($quote);
+
+        $calculator->calculate($quote);
+
+        $quote->update(['status' => 'in_review']);
+
+        return back()->with('success', 'Quote submitted for review. You can no longer make changes.');
+    }
+
+    public function approve(string $token): RedirectResponse
+    {
+        $quote = Quote::where('public_token', $token)->firstOrFail();
+
+        abort_unless($quote->status === 'sent_to_client', 403, 'This quote is not ready for approval.');
+
+        $quote->update(['status' => 'approved']);
+
+        return back()->with('success', 'Quote approved. Thank you.');
     }
 
     // ── Line items ───────────────────────────────────────────────
@@ -95,6 +124,8 @@ class CalculatorController extends Controller
     public function addItem(Request $request, string $token, QuoteCalculator $calculator): RedirectResponse
     {
         $quote = Quote::where('public_token', $token)->firstOrFail();
+
+        $this->abortIfSubmitted($quote);
 
         $data = $request->validate([
             'phase_id'         => ['required', 'integer', 'exists:phases,id'],
@@ -134,6 +165,8 @@ class CalculatorController extends Controller
     {
         $quote = Quote::where('public_token', $token)->firstOrFail();
 
+        $this->abortIfSubmitted($quote);
+
         abort_if($lineItem->phase->quote_id !== $quote->id, 403);
 
         $phaseId = $lineItem->phase_id;
@@ -146,9 +179,32 @@ class CalculatorController extends Controller
         )->with('success', 'Item removed.');
     }
 
+    public function updateItemQty(Request $request, string $token, LineItem $lineItem, QuoteCalculator $calculator): RedirectResponse
+    {
+        $quote = Quote::where('public_token', $token)->firstOrFail();
+
+        $this->abortIfSubmitted($quote);
+
+        abort_if($lineItem->phase->quote_id !== $quote->id, 403);
+
+        $data = $request->validate([
+            'quantity' => ['required', 'numeric', 'min:0'],
+        ]);
+
+        $lineItem->update(['quantity' => $data['quantity']]);
+
+        $calculator->calculate($quote);
+
+        return redirect(
+            route('calculator.show', $token) . '#phase-' . $lineItem->phase_id
+        )->with('success', 'Quantity updated.');
+    }
+
     public function moveItem(Request $request, string $token, LineItem $lineItem, QuoteCalculator $calculator): RedirectResponse
     {
         $quote = Quote::where('public_token', $token)->firstOrFail();
+
+        $this->abortIfSubmitted($quote);
 
         abort_if($lineItem->phase->quote_id !== $quote->id, 403);
 
@@ -180,6 +236,11 @@ class CalculatorController extends Controller
         $pdf = Pdf::loadView('quotes.pdf', compact('quote'))
             ->setPaper('a4', 'portrait');
 
-        return $pdf->download('quote-' . $quote->public_token . '.pdf');
+        return $pdf->download('quote-' . ($quote->quote_number ?? $quote->public_token) . '.pdf');
+    }
+
+    private function abortIfSubmitted(Quote $quote): void
+    {
+        abort_if(!$quote->isPublicEditable(), 403, 'This quote has already been submitted for review.');
     }
 }
